@@ -98,3 +98,21 @@ Iowa Wound Pain analyses 2021
 [summarize_denoise.sh](https://github.com/Grice-Lab/IowaWound/blob/master/scripts/summarize_denoise.sh)
 
 
+# (6) Make phylogeny 
+## Input
+- IowaWoundData/MiSeqV1V3_32/rep-seqs32.qza 
+- IowaWoundData/MiSeqV1V3_35/rep-seqs35.qza 
+
+## Outputs
+-  IowaWoundData/MiSeqV1V3_32/aligned-rep-seqs32.qza
+-  IowaWoundData/MiSeqV1V3_35/aligned-rep-seqs35.qza
+-  IowaWoundData/MiSeqV1V3_32/masked-aligned-rep-seqs32.qza
+-  IowaWoundData/MiSeqV1V3_35/masked-aligned-rep-seqs35.qza
+-  IowaWoundData/MiSeqV1V3_32/unrooted-tree32.qza
+-  IowaWoundData/MiSeqV1V3_35/unrooted-tree35.qza
+-  IowaWoundData/MiSeqV1V3_32/rooted-tree32.qza
+-  IowaWoundData/MiSeqV1V3_32/rooted-tree35.qza
+## Scripts
+
+- [make_phylogeny.sh](https://github.com/Grice-Lab/IowaWound/blob/master/scripts/make_phylogeny.sh)
+    
