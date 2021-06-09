@@ -40,5 +40,5 @@ for filename in $READSPATH32/*_1.fastq.gz; do
 
 done
 
-multiqc -n MultiQC_PostDemuxed32 $OUTPUT
-
+multiqc -n MultiQC_PostDemuxed $OUTPUT
+mv MultiQC_PostDemuxed /home/acampbe/IowaWoundData/MultiQC_PostDemuxed

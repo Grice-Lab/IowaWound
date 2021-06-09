@@ -7,8 +7,9 @@
 # and for each run 
 
 library(dplyr)
-setwd("/Users/amycampbell/Desktop/GriceLabGit/IowaWound/")
-
+#setwd("/Users/amycampbell/Desktop/GriceLabGit/IowaWound")
+# Data path
+datapath = "/home/acampbe/IowaWoundData/MultiQC_PostDemuxed/"
 
 # check sample name 
 direction = function(x){
@@ -23,7 +24,7 @@ direction = function(x){
 }
 
 # Forward and reverse markings 
-qualities_position = read.table("data/MultiQC_PostDemuxed_both//mqc_fastqc_per_base_sequence_quality_plot_1.txt", sep="\t", header=T)
+qualities_position = read.table(paste0(datapath, "mqc_fastqc_per_base_sequence_quality_plot_1.txt"), sep="\t", header=T)
 qualities_position$Direction = sapply(qualities_position$Sample, function(x) direction(x))
 
 
