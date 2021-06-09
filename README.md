@@ -59,12 +59,12 @@ Iowa Wound Pain analyses 2021
 - IowaWoundData/MultiQC_PostDemuxed/mqc_fastqc_per_base_sequence_quality_plot_1.txt 
 - IowaWoundData/MiSeqV1V3_35/paired-end-demux35.qza
 - IowaWoundData/MiSeqV1V3_32/paired-end-demux32.qza
-- denoising.sh parameters for MiSeqV1V3_32 chosen:
+- denoising.sh parameters for MiSeqV1V3_32 chosen in ChooseDadaTruncations.R:
 - - –p-trunc-len-f 272
-- - p-trunc-len-r 257
-- denoising.sh parameters for MiSeqV1V3_35 chosen:
-- –p-trunc-len-f 262
-- –p-trunc-len-r 232 
+- - -p-trunc-len-r 257
+- denoising.sh parameters for MiSeqV1V3_35 chosen in ChooseDadaTruncations.R:
+- - –p-trunc-len-f 262
+- - –p-trunc-len-r 232 
 
 ## Outputs
 - IowaWoundData/MiSeqV1V3_32/rep-seqs32.qza
