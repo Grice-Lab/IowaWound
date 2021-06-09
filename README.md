@@ -27,3 +27,18 @@ Iowa Wound Pain analyses 2021
 ## Scripts
 
 [import_data.sh](https://github.com/Grice-Lab/IowaWound/blob/master/scripts/import_data.sh)
+
+# (3) Import data into Qiime2 & summarize input
+
+## Input
+- Raw demultiplexed data path from Qi’s pipeline in IowaWoundData/MiSeqV1V3_35/demultiplexed, IowaWoundData/MiSeqV1V3_32/demultiplexed
+-  GH:IowaWound/mappings/Manifest35.tsv, GH:IowaWound/mappings/Manifest32.tsv
+
+## Outputs
+- IowaWoundData/MiSeqV1V3_35/paired-end-demux35.qza
+- IowaWoundData/MiSeqV1V3_32/paired-end-demux32.qza
+
+## Scripts
+
+[import_data.sh](https://github.com/Grice-Lab/IowaWound/blob/master/scripts/import_data.sh)
+[summarize_input.sh](https://github.com/Grice-Lab/IowaWound/blob/master/scripts/summarize_input.sh)
