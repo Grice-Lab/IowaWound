@@ -11,6 +11,6 @@ Iowa Wound Pain analyses 2020
 
 ## Scripts
 
-    [make_manifest_32.sh](https://github.com/Grice-Lab/IowaWound/blob/master/scripts/make_manifest_35.sh)
-    [make_manifest_35.sh](https://github.com/Grice-Lab/IowaWound/blob/master/scripts/make_manifest_32.sh)
+[make_manifest_32.sh](https://github.com/Grice-Lab/IowaWound/blob/master/scripts/make_manifest_35.sh)
+[make_manifest_35.sh](https://github.com/Grice-Lab/IowaWound/blob/master/scripts/make_manifest_32.sh)
     
