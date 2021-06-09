@@ -77,3 +77,22 @@ Iowa Wound Pain analyses 2021
 ## Scripts
 - [ChooseDadaTruncations.R](https://github.com/Grice-Lab/IowaWound/blob/master/scripts/ChooseDadaTruncations.R)
 - [denoise.sh](https://github.com/Grice-Lab/IowaWound/blob/master/scripts/denoise.sh)
+
+# (5) Visualizations of denoising output 
+## Input
+- IowaWoundData/MiSeqV1V3_32/rep-seqs32.qza
+- IowaWoundData/MiSeqV1V3_32/table32.qza
+- IowaWoundData/MiSeqV1V3_32/denoising-stats32.qza
+- IowaWoundData/MiSeqV1V3_35/rep-seqs35.qza
+- IowaWoundData/MiSeqV1V3_35/table35.qza
+- IowaWoundData/MiSeqV1V3_35/denoising-stats35.qza
+## Output
+- IowaWoundData/MiSeqV1V3_32/rep-seqs32.qzv
+- IowaWoundData/MiSeqV1V3_32/table32.qzv
+- IowaWoundData/MiSeqV1V3_32/denoising-stats32.qzv
+- IowaWoundData/MiSeqV1V3_35/rep-seqs35.qzv
+- IowaWoundData/MiSeqV1V3_35/table35.qzv
+- IowaWoundData/MiSeqV1V3_35/denoising-stats35.qzv
+
+## Scripts
+[summarize_denoise.sh](https://github.com/Grice-Lab/IowaWound/blob/master/scripts/summarize_denoise.sh)
