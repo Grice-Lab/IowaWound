@@ -26,4 +26,4 @@ Iowa Wound Pain analyses 2020
 
 ## Scripts
 
-import_data.sh
+[import_data.sh](https://github.com/Grice-Lab/IowaWound/blob/master/scripts/import_data.sh)
