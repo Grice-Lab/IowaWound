@@ -40,3 +40,39 @@ Iowa Wound Pain analyses 2021
 ## Scripts
 
 - [fastqc.sh](https://github.com/Grice-Lab/IowaWound/blob/master/scripts/fastqc.sh)
+
+# (3) FastQC to get quality metrics 
+
+## Input
+- Raw demultiplexed data path from Qi’s pipeline in IowaWoundData/MiSeqV1V3_35/demultiplexed, IowaWoundData/MiSeqV1V3_32/demultiplexed
+
+## Outputs
+- Full MultiQC output to IowaWoundData/MultiQC_PostDemuxed
+
+## Scripts
+
+- [fastqc.sh](https://github.com/Grice-Lab/IowaWound/blob/master/scripts/fastqc.sh)
+
+# (4) Selection of truncation lengths and denoising with DADA
+
+## Input
+- IowaWoundData/MultiQC_PostDemuxed/mqc_fastqc_per_base_sequence_quality_plot_1.txt 
+- IowaWoundData/MiSeqV1V3_35/paired-end-demux35.qza
+- IowaWoundData/MiSeqV1V3_32/paired-end-demux32.qza
+- denoising.sh parameters for MiSeqV1V3_32 chosen:
+- - –p-trunc-len-f 272
+- - p-trunc-len-r 257
+- denoising.sh parameters for MiSeqV1V3_35 chosen:
+- –p-trunc-len-f 262
+- –p-trunc-len-r 232 
+
+## Outputs
+- IowaWoundData/MiSeqV1V3_32/rep-seqs32.qza
+- IowaWoundData/MiSeqV1V3_32/table32.qza
+- IowaWoundData/MiSeqV1V3_32/denoising-stats32.qza
+- IowaWoundData/MiSeqV1V3_35/rep-seqs35.qza
+- IowaWoundData/MiSeqV1V3_35/table35.qza
+- IowaWoundData/MiSeqV1V3_35/denoising-stats35.qza
+
+## Scripts
+- [fastqc.sh](https://github.com/Grice-Lab/IowaWound/blob/master/scripts/fastqc.sh)
