@@ -1,7 +1,7 @@
-
-# data/table-with-taxonomy.biom
 # Amy Campbell
 # Output of Qiime2 
+# July 2021
+
 library("phyloseq")
 library("dplyr")
 library("stringr")
@@ -102,29 +102,63 @@ phylo35 = subset_taxa(phylo35, Kingdom == "Bacteria")
 phylofull = subset_taxa(phylofull, Kingdom == "Bacteria")
 
 
+##########################################
 # Process decontamination for MiSeqV1V3_32
 ##########################################
 
-# Identify OTUs present in the water controls in >.01 
+# (1) Identify contaminants to remove from MiSeqV1V3_32 based on decontam
+#########################################################################
 Controls32 = subset_samples(phylo32, ControlStatus!="NonControl")
 Controls32@sam_data$Sample_Ctrl = paste(Controls32@sam_data$SampleID, Controls32@sam_data$ControlStatus, sep="_")
 plot_bar(Controls32, "Sample_Ctrl", fill="Phylum") + scale_fill_manual(values=ampalette)
 
 # Remove mock for just negative ctrls
 Negatives32 = subset_samples(Controls32, SampleID!="120602")
+NegativeIDs = (Negatives32@sam_data$SampleID)
 
+# Decontam Prevalence based method on all negative controls (blanks + DNA-free water controls)
+phylo32@sam_data$is.negative = if_else(phylo32@sam_data$SampleID %in% NegativeIDs, TRUE, FALSE)
+contaminants_prevalence = isContaminant(phylo32, method="prevalence", neg="is.negative")
 
+contaminants_prevalence$ID = row.names(contaminants_prevalence)
+taxonomy_map_contams = taxonomy_map
+taxonomy_map_contams$ID = save_OTUs
+contaminants_prevalence = contaminants_prevalence %>% left_join(taxonomy_map_contams,by="ID")
 
-otus_ctrls_35 = data.frame(Water_controls@otu_table@.Data)
-otus_ctrls_35$otuID = rownames(otus_ctrls_35)
-controls_greater_35 = transform_sample_counts(Water_controls, function(x) x / sum(x))
-controls_greater_35 = filter_taxa(controls_greater_35, function(x) mean(x) > .01, TRUE)
-otus_to_check_35=rownames(controls_greater_35@otu_table@.Data)
+# when you include all DNA-free water controls and blank controls 
+contaminants_allNegativeControls = contaminants_prevalence %>% filter(contaminant)
 
+# Firmicutes genera
+Negatives32_Firmicutes = subset_taxa(Negatives32, Phylum=="Firmicutes")
+Negatives32_Firmicutes_abundance  = transform_sample_counts(Negatives32_Firmicutes, function(x) x / sum(x) )
+Negatives32_Firmicutes_abundance@otu_table@.Data[,"120603"] <- 0
+Negatives32_Firmicutes_abundance_keep = filter_taxa(Negatives32_Firmicutes_abundance, function(x) mean(x) > 1e-5, TRUE)
 
+Negatives32_Firmicutes = prune_taxa(row.names(Negatives32_Firmicutes_abundance_REMOVE@tax_table),Negatives32_Firmicutes)
+plot_bar(Negatives32_Firmicutes, "Sample_Ctrl", fill="Genus") + scale_fill_manual(values=ampalette) + ggtitle("OTUs of Firmicutes genera in negative controls")
+
+# (2) Further identify OTUs present at >.1% in both blank swab extraction controls to remove from BOTH runs
+###########################################################################################################
+ExtractionControls = subset_samples(phylo32, ControlStatus=="ExtractionControl")
+ExtractionControlsRelAbundance = transform_sample_counts(ExtractionControls, function(x) x / sum(x) )
+ExtractionControlsRelAbundanceDF = data.frame(ExtractionControlsRelAbundance@otu_table@.Data)
+ExtractionControlsRelAbundanceDF$OTU = row.names(ExtractionControlsRelAbundance@otu_table@.Data)
+ExtractionControlsRelAbundanceDF = ExtractionControlsRelAbundanceDF %>% mutate(Extraction1Present = if_else(X120363 > .001, 1, 0), Extraction2Present = if_else(X120586 > .001, 1, 0))
+ExtractionControls_Positive = ExtractionControlsRelAbundanceDF %>% filter(Extraction1Present+Extraction2Present == 2)
+
+# What are we removing?
+taxonomy_map_removes = taxonomy_map
+taxonomy_map_removes$OTU = save_OTUs
+ExtractionControls_Positive = ExtractionControls_Positive %>% left_join(taxonomy_map_removes, by="OTU")
+intersect(contaminants_prevalence$ID, ExtractionControls_Positive$OTU)
+# One Staphylococcus OTU, one cutibacterium OTU, one Ralstonia OTU; All three of these were ID'd as contaminants by Decontam as well. 
+Remove_from_Both = ExtractionControls_Positive$OTU
+
+#
+#######################################################
 
 df <- as.data.frame(sample_data(phylofull)) # Put sample_data into a ggplot-friendly data.frame
 df$LibrarySize <- sample_sums(phylofull)
 df <- df[order(df$LibrarySize),]
 df$Index <- seq(nrow(df))
-ggplot(data=df, aes(x=Index, y=LibrarySize, color=ControlStatus)) + geom_point()
+ggplot(data=df, aes(x=Index, y=LibrarySize, color=ControlStatus)) + geom_point() + scale_y_continuous(limits=c(0, 170000),breaks=seq(0,170000,by=10000)) + scale_color_manual(values=ampalette[8:12])
