@@ -102,9 +102,9 @@ phylo35 = subset_taxa(phylo35, Kingdom == "Bacteria")
 phylofull = subset_taxa(phylofull, Kingdom == "Bacteria")
 
 
-##########################################
-# Process decontamination for MiSeqV1V3_32
-##########################################
+################################################################
+# Process decontamination for MiSeqV1V3_32 --> phylo32_filtered
+################################################################
 
 # (1) Identify contaminants to remove from MiSeqV1V3_32 based on decontam
 #########################################################################
@@ -151,14 +151,104 @@ taxonomy_map_removes = taxonomy_map
 taxonomy_map_removes$OTU = save_OTUs
 ExtractionControls_Positive = ExtractionControls_Positive %>% left_join(taxonomy_map_removes, by="OTU")
 intersect(contaminants_prevalence$ID, ExtractionControls_Positive$OTU)
+
+# Filter based on findings
+##########################
+TaxaToKeep = setdiff(taxa_names(phylo32),contaminants_allNegativeControls$ID)
+phylo32_filtered = subset_samples(phylo32, ControlStatus == "NonControl")
+phylo32_filtered = prune_taxa(TaxaToKeep, phylo32_filtered)
+
+
 # One Staphylococcus OTU, one cutibacterium OTU, one Ralstonia OTU; All three of these were ID'd as contaminants by Decontam as well. 
 Remove_from_Both = ExtractionControls_Positive$OTU
 
-#
-#######################################################
+################################################################
+# Process decontamination for MiSeqV1V3_35 --> phylo35_filtered
+################################################################
 
-df <- as.data.frame(sample_data(phylofull)) # Put sample_data into a ggplot-friendly data.frame
-df$LibrarySize <- sample_sums(phylofull)
-df <- df[order(df$LibrarySize),]
-df$Index <- seq(nrow(df))
-ggplot(data=df, aes(x=Index, y=LibrarySize, color=ControlStatus)) + geom_point() + scale_y_continuous(limits=c(0, 170000),breaks=seq(0,170000,by=10000)) + scale_color_manual(values=ampalette[8:12])
+# DNA-free water only
+Controls35 = subset_samples(phylo35, ControlStatus!="NonControl")
+# ignore empty wells
+Controls35 = subset_samples(Controls35, ControlStatus!="Empty")
+plot_bar(Controls35, "SampleID", fill="Phylum") + scale_fill_manual(values=ampalette) + ggtitle("Run 35 Water Control Phyla")
+
+Controls35_Firmicutes = subset_taxa(Controls35, Phylum=="Firmicutes")
+Controls35_FirmicutesAbundance =  transform_sample_counts(Controls35_Firmicutes, function(x) x / sum(x) )
+Controls35_FirmicutesAbundance@otu_table@.Data[,c("DNAfreewater1", "DNAfreewater2", "DNAfreewater3", "DNAfreewater4")] <- 0
+Controls35_Firmicutes_abundance_keep = filter_taxa(Controls35_FirmicutesAbundance, function(x) mean(x) > 1e-5, TRUE)
+Controls35_Firmicutes = prune_taxa(taxa_names(Controls35_Firmicutes_abundance_keep), Controls35_Firmicutes)
+
+plot_bar(Controls35_Firmicutes, "SampleID", fill="Genus") + scale_fill_manual(values=ampalette) + ggtitle("Run 35 Water Control Genera in Firmicutes")
+
+# Prevalence-based contaminant identification
+#############################################
+phylo35 = subset_samples(phylo35,ControlStatus!="Empty" )
+phylo35@sam_data$is.negative = if_else(phylo35@sam_data$ControlStatus =="PCRControl", TRUE, FALSE)
+contaminants_prevalence35 = isContaminant(phylo35, method="prevalence", neg="is.negative")
+contaminants_prevalence35$ID = row.names(contaminants_prevalence35)
+contaminants_prevalence35 = contaminants_prevalence35 %>% left_join(taxonomy_map_contams,by="ID")
+OTUs_Remove_prevalence35 = (contaminants_prevalence35 %>% filter(contaminant))$ID
+
+# Concentration-based contaminant identification
+################################################
+phylo35@sam_data$SampleID
+ConcentrationInfo = read.csv2("/Users/amycampbell/Desktop/GriceLabGit/Club_Grice/mapping_files/run_maps/MiSeqV1V3_35.tsv", sep="\t")
+ConcentrationInfo$SampleID = ConcentrationInfo$X.SampleID 
+ConcentrationInfo = ConcentrationInfo %>% select(SampleID, final_dna_concentration_ng_ul)
+phylo35DF = data.frame(phylo35@sam_data)
+phylo35DF = phylo35DF %>% left_join(ConcentrationInfo, by="SampleID")
+phylo35@sam_data$Concentration = sapply(phylo35DF$final_dna_concentration_ng_ul, function(x) as.numeric(as.character(x)))
+phylo35 = subset_samples(phylo35, ControlStatus=="NonControl")
+contaminants_frequency35 <- isContaminant(phylo35, method="frequency", conc="Concentration")
+contaminants_frequency35 = contaminants_frequency35 %>% filter(contaminant)
+contaminants_frequency35$ID = row.names(contaminants_frequency35)
+contaminants_frequency35 = contaminants_frequency35 %>% left_join(taxonomy_map_contams, by="ID")
+
+# none of the contaminants are in common with the prevalence-based ones
+intersect(row.names(contaminants_frequency35), OTUs_Remove_prevalence35)
+
+OTUs_Remove_concentration35 = contaminants_frequency35$ID
+
+# Assemble list of OTUs to remove
+# First combine prevalence-based and concentration-based contaminants
+OTUs_Remove35 = append(OTUs_Remove_prevalence35, OTUs_Remove_concentration35)
+# Then add the ones ID'd in the extraction controls from run 32
+OTUs_Remove35 = unique(append(OTUs_Remove35, Remove_from_Both))
+#make list of OTUs to keep 
+OTUs_keep35 = setdiff(taxa_names(phylo35), OTUs_Remove35)
+
+phylo35_filtered = prune_taxa(OTUs_keep35, phylo35)
+
+
+###############################################
+# Join together and do final prevalence filter
+###############################################
+
+# Join
+phylo_joined = merge_phyloseq(phylo32_filtered, phylo35_filtered)
+otunames = rownames(phylo_joined@otu_table)
+sampnames = colnames(phylo_joined@otu_table)
+
+
+phylo_joined_relabundance = transform_sample_counts(phylo_joined, function(x) x / sum(x) )
+OTU_table_full = data.frame(phylo_joined_relabundance@otu_table)
+OTU_table_full[is.na(OTU_table_full)] <- 0 
+OTU_table_full[OTU_table_full < .001 ] <- 0
+
+
+OTU_table_full$Prevalence <- apply(OTU_table_full, 1, function(x) sum(x>0))
+
+
+# Filter to OTUs present in at least .1% in at least 1 sample
+OTU_table_full  = subset(OTU_table_full, Prevalence >=1 )
+OTU_table_full$Prevalence = NULL
+OTUs_keep_prevalence = rownames(OTU_table_full)
+
+phylo_joined = prune_taxa(OTUs_keep_prevalence, phylo_joined)
+
+deseqobj_full = phyloseq_to_deseq2(phylo_joined, ~SampleID)
+
+save(deseqobj_full, file="data/DESeqObject21.rda")
+
+
+
