@@ -38,6 +38,19 @@ row_object <- function(taxa_id){
 # Read in data & metadata 
 OTU_Table = read.csv2("data/table.from_biom_w_taxonomy.txt", header=T, sep="\t",skip=1)
 controls_run = read.csv2("mappings/Control_Run_Info.tsv", header=T, sep=" ")
+patient_mapping32 = read.csv("mappings/IA_woundpain_mapping_32_2021.csv")
+patient_mapping35 = read.csv("mappings/IA_woundpain_mapping_35_2021.csv")
+patient_metadata = read.csv("/Users/amycampbell/Desktop/GriceLabGit/IowaWound/figuring_out_metadata_5_21/GSWOUNDGRICE2015_20190221.csv")
+
+patient_mapping32$SampleID = as.factor(patient_mapping32$X.SampleID)
+patient_mapping35$SampleID = as.factor(patient_mapping35$X.SampleID)
+
+denoise32 = read.csv2("data/DenoiseStats32.tsv", sep="\t")
+denoise32 = denoise32[-1, ]
+
+denoise35 = read.csv2("data/DenoiseStats35.tsv", sep="\t")
+denoise35 = denoise35[-1, ]
+ 
 taxonomy_column = OTU_Table$taxonomy 
 taxonomy_map = OTU_Table %>% select(X.OTU.ID, taxonomy)
 
@@ -67,9 +80,7 @@ OTU_Table = mapply(function(x) as.numeric(as.character(x)),OTU_Table)
 rownames(OTU_Table) = save_rows
 OTU_tab = otu_table(OTU_Table, taxa_are_rows=TRUE)
 
-
 sample_names(OTU_tab) = lapply(list(sample_names(OTU_tab)), function(x) str_replace(x, "X", ""))[[1]]
-
 
 # Make sample data objects for input into phyloseq
 ###################################################
@@ -96,11 +107,81 @@ phylofull = phyloseq(OTU_tab, taxonomy_matrix, sampledataboth)
 phylo32 = subset_taxa(phylo32,Phylum !="Cyanobacteria")
 phylo35 = subset_taxa(phylo35,Phylum !="Cyanobacteria")
 phylofull = subset_taxa(phylofull,Phylum !="Cyanobacteria")
+
 # Filter all non-bacteria
 phylo32 = subset_taxa(phylo32, Kingdom == "Bacteria")
 phylo35 = subset_taxa(phylo35, Kingdom == "Bacteria")
 phylofull = subset_taxa(phylofull, Kingdom == "Bacteria")
 
+# Look at non-chimeric reads in each sample, characterized & uncharacterized
+#############################################################################
+denoise35 = denoise35 %>% select(sample.id, filtered, non.chimeric)
+denoise32 = denoise32 %>% select(sample.id, filtered, non.chimeric)
+
+# Look at proportions of 
+phylo32@sam_data$Reads = colSums(phylo32@otu_table@.Data)
+phylo35@sam_data$Reads = colSums(phylo35@otu_table@.Data)
+
+samdata32 = data.frame(phylo32@sam_data) %>% filter(ControlStatus=="NonControl")
+samdata35 = data.frame(phylo35@sam_data) %>% filter(ControlStatus=="NonControl")
+
+colnames(denoise32) = c("SampleID", "Filtered", "NonChimeric")
+colnames(denoise35) = c("SampleID", "Filtered", "NonChimeric")
+
+samdata32 = samdata32 %>% left_join(denoise32, by="SampleID")
+samdata35 = samdata35 %>% left_join(denoise35, by="SampleID")
+
+samdata32$Filtered = sapply(samdata32$Filtered, function(x) as.numeric(as.character(x)))
+samdata35$Filtered = sapply(samdata35$Filtered, function(x) as.numeric(as.character(x)))
+
+samdata32$NonChimeric = sapply(samdata32$NonChimeric, function(x) as.numeric(as.character(x)))
+samdata35$NonChimeric = sapply(samdata35$NonChimeric, function(x) as.numeric(as.character(x)))
+
+samdata32$Chimeric = samdata32$Filtered - samdata32$NonChimeric
+samdata35$Chimeric = samdata35$Filtered - samdata35$NonChimeric
+
+samdata32 = samdata32 %>% left_join(patient_mapping32, by="SampleID")
+
+
+# Filter non-control samples to those with minimum 1000 reads prior to decontam
+###############################################################################
+
+phylo32_original = sample_names(phylo32)
+phylo35_original = sample_names(phylo35)
+
+phylo32@sam_data$Reads <- colSums(phylo32@otu_table@.Data)
+phylo35@sam_data$Reads <- colSums(phylo35@otu_table@.Data)
+
+# 217 - 208 = 9 removed from run 32
+# 233 - 155 = 78 removed from run 35
+# 363 positive samples left 
+
+phylo32 <- subset_samples(phylo32, !(ControlStatus=="NonControl" & Reads < 1000))
+phylo35 <- subset_samples(phylo35,  !(ControlStatus=="NonControl" & Reads < 1000))
+
+DepthFiltered32 = setdiff(phylo32_original, sample_names(phylo32))
+DepthFiltered35 = setdiff(phylo35_original, sample_names(phylo35))
+
+DepthFilteredPatients32 = patient_mapping32 %>% filter(X.SampleID %in% DepthFiltered32)
+DepthFilteredPatientMetadata32 = patient_metadata %>% filter(study_id %in% DepthFilteredPatients32$SubjectID)
+# one traumatic wound (5), one mixed (6), 7 surgical (4) in 32 
+# 64 surgical (4), 
+
+DepthFilteredPatients35 = patient_mapping35 %>% filter(X.SampleID %in% DepthFiltered35)
+DepthFilteredPatientMetadata35 = patient_metadata %>% filter(study_id %in% DepthFilteredPatients35$SubjectID)
+
+patient_metadata=patient_metadata %>% mutate(Removed = if_else(study_id %in% DepthFilteredPatients35$SubjectID | study_id %in% DepthFilteredPatients32$SubjectID,"Remove", "Keep"))
+patient_metadata = patient_metadata %>% mutate(WoundDescription = case_when(wound_type == 1 ~ "PressureUlcer",
+                                                         wound_type==2 ~ "VenousUlcer",
+                                                         wound_type==3 ~"ArterialUlcer",
+                                                         wound_type==4 ~ "Surgical", 
+                                                         wound_type==5 ~ "Traumatic",
+                                                         wound_type==6 ~ "MixedTraumaticSurgical",
+                                                         TRUE ~ "Other"))
+
+ggplot(patient_metadata, aes(Removed)) + aes(x=Removed, fill=WoundDescription) + geom_bar() + scale_fill_manual(values=rev(ampalette)) + xlab("") + ylab("Count total") + ggtitle("Depth-removed samples by\ntotal count")
+
+ggplot(patient_metadata, aes(Removed)) + aes(x=Removed, fill=WoundDescription) + geom_bar(position="fill") + scale_fill_manual(values=rev(ampalette)) + xlab("") + ylab("Proportion total") + ggtitle("Depth-removed samples by proportion")
 
 ################################################################
 # Process decontamination for MiSeqV1V3_32 --> phylo32_filtered
@@ -134,7 +215,7 @@ Negatives32_Firmicutes_abundance  = transform_sample_counts(Negatives32_Firmicut
 Negatives32_Firmicutes_abundance@otu_table@.Data[,"120603"] <- 0
 Negatives32_Firmicutes_abundance_keep = filter_taxa(Negatives32_Firmicutes_abundance, function(x) mean(x) > 1e-5, TRUE)
 
-Negatives32_Firmicutes = prune_taxa(row.names(Negatives32_Firmicutes_abundance_REMOVE@tax_table),Negatives32_Firmicutes)
+Negatives32_Firmicutes = prune_taxa(row.names(Negatives32_Firmicutes_abundance_keep@tax_table),Negatives32_Firmicutes)
 plot_bar(Negatives32_Firmicutes, "Sample_Ctrl", fill="Genus") + scale_fill_manual(values=ampalette) + ggtitle("OTUs of Firmicutes genera in negative controls")
 
 # (2) Further identify OTUs present at >.1% in both blank swab extraction controls to remove from BOTH runs
@@ -246,9 +327,36 @@ OTUs_keep_prevalence = rownames(OTU_table_full)
 
 phylo_joined = prune_taxa(OTUs_keep_prevalence, phylo_joined)
 
-deseqobj_full = phyloseq_to_deseq2(phylo_joined, ~SampleID)
+
+phylo_joined_backup = phylo_joined
+phylo_joined_backup@sam_data$Reads_After_Decontam = colSums(phylo_joined@otu_table)
+phylo_joined_lowcounts = subset_samples(phylo_joined_backup, Reads_After_Decontam <1000)
+phylo_joined_lowcounts_Actino = subset_taxa(phylo_joined_lowcounts,Phylum=="Actinobacteriota")
+phylo_joined_lowcounts_Firmicutes= subset_taxa(phylo_joined_lowcounts,Phylum=="Firmicutes")
+
+plot_bar(phylo_joined_lowcounts_Actino, fill="Family")
+plot_bar(phylo_joined_lowcounts_Firmicutes, fill="Family")
+
+deseqobj_full = phyloseq_to_deseq2(phylo_joined, ~1)
 
 save(deseqobj_full, file="data/DESeqObject21.rda")
 
+ deseqobj = deseqobj_full
+get_geometric_means <- function(x){
+  mean = exp(sum(log(x[x>0]), na.rm=TRUE) / length(x))
+   return(mean)
+ }
+ 
+matrixcounts = counts(deseqobj)
+# 
+gmeans = apply(counts(deseqobj), 1, get_geometric_means)
+# 
+ estimates_sizes = estimateSizeFactors(deseqobj, geoMeans = gmeans)
+# 
+ disp_estimates = estimateDispersions(estimates_sizes)
+ 
+ v_stabilized = getVarianceStabilizedData(disp_estimates)
+# save(v_stabilized, file = "/home/acampbe/Club_Grice/scripts/acampbe/IowaWound/V_stabilized_IowaWound_Combined.rda")
 
-
+# Feel like I should plot sample sizes (depth) against type of wound to see if I should actually just use wound type as the factor for the VST transformation. 
+sessionInfo()
