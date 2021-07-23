@@ -13,6 +13,7 @@ ampalette <- rev(c("#B85C00","#999999","#339966","#6B24B2","#56B4E9","#D119A3","
                    "#9900FF","#B85C00","#999999","#339966","#6B24B2","#56B4E9","#D119A3","#006600", "#CC0000", 
                    "#F0E442", "#4D4D4D",  "#CC99FF","#663300","#33CC33", "#0072B2", "#FF9900", 
                    "#9900FF"))
+twocolor = c("#FFC20A", "#0C7BDC")
 ###########
 # FUNCTIONS
 ###########
@@ -140,8 +141,19 @@ samdata35$NonChimeric = sapply(samdata35$NonChimeric, function(x) as.numeric(as.
 samdata32$Chimeric = samdata32$Filtered - samdata32$NonChimeric
 samdata35$Chimeric = samdata35$Filtered - samdata35$NonChimeric
 
+patient_metadata$SubjectID = as.factor(patient_metadata$study_id)
 samdata32 = samdata32 %>% left_join(patient_mapping32, by="SampleID")
+samdata32 = samdata32 %>% left_join(patient_metadata, by = "SubjectID")
 
+samdata35 = samdata35 %>% left_join(patient_mapping35, by="SampleID")
+samdata35 = samdata35 %>% left_join(patient_metadata, by = "SubjectID")
+
+# Plots of proportion chimera
+chimeras32melt = samdata32 %>% select(SampleID, Chimeric, NonChimeric, wound_type) %>% reshape2::melt(id.vars=c("SampleID", "wound_type"))
+chimeras32 = ggplot(chimeras32melt, aes(x=SampleID, y=value, fill=variable))+ geom_bar(aes(fill=variable), stat="identity")
+chimeras32_order = chimeras32melt %>% filter(variable=="NonChimeric") %>% arrange(wound_type, value)
+chimeras32$data$SampleID = factor(chimeras32$data$SampleID, levels=chimeras32_order$SampleID)
+chimeras32 + theme_classic() + scale_fill_manual(values=twocolor)
 
 # Filter non-control samples to those with minimum 1000 reads prior to decontam
 ###############################################################################
