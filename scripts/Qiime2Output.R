@@ -153,7 +153,28 @@ chimeras32melt = samdata32 %>% select(SampleID, Chimeric, NonChimeric, wound_typ
 chimeras32 = ggplot(chimeras32melt, aes(x=SampleID, y=value, fill=variable))+ geom_bar(aes(fill=variable), stat="identity")
 chimeras32_order = chimeras32melt %>% filter(variable=="NonChimeric") %>% arrange(wound_type, value)
 chimeras32$data$SampleID = factor(chimeras32$data$SampleID, levels=chimeras32_order$SampleID)
-chimeras32 + theme_classic() + scale_fill_manual(values=twocolor)
+chimeras32 = chimeras32 + theme_classic() + scale_fill_manual(values=twocolor) +theme(axis.text.x=element_blank()) + xlab("") + ggtitle("Run 32 Chimeric Reads")
+
+chimeras35melt = samdata35 %>% select(SampleID, Chimeric, NonChimeric, wound_type) %>% reshape2::melt(id.vars=c("SampleID", "wound_type"))
+chimeras35 = ggplot(chimeras35melt, aes(x=SampleID, y=value, fill=variable))+ geom_bar(aes(fill=variable), stat="identity")
+chimeras35_order = chimeras35melt %>% filter(variable=="NonChimeric") %>% arrange(wound_type, value)
+chimeras35$data$SampleID = factor(chimeras35$data$SampleID, levels=chimeras35_order$SampleID)
+chimeras35 = chimeras35 + theme_classic() + scale_fill_manual(values=twocolor) +theme(axis.text.x=element_blank()) + xlab("") + ggtitle("Run 35 Chimeric Reads")
+ggsave(gridExtra::grid.arrange(chimeras32, chimeras35), file="ChimericReads.pdf")
+
+# Plot of proportion reads mapped 
+samdata32$Uncharacterized = samdata32$NonChimeric - samdata32$Reads
+samdata35$Uncharacterized = samdata35$NonChimeric - samdata35$Reads
+samdata32$Characterized =  samdata32$Reads
+samdata35$Characterized =  samdata35$Reads
+
+characterized32 = samdata32 %>% select(SampleID, Uncharacterized, Characterized, wound_type) %>% reshape2::melt(id.vars=c("SampleID", "wound_type"))
+characterized35 = samdata35 %>% select(SampleID, Uncharacterized, Characterized, wound_type) %>% reshape2::melt(id.vars=c("SampleID", "wound_type"))
+
+
+#%>% select(SampleID, Chimeric, NonChimeric, wound_type) %>% reshape2::melt(id.vars=c("SampleID", "wound_type"))
+
+
 
 # Filter non-control samples to those with minimum 1000 reads prior to decontam
 ###############################################################################
