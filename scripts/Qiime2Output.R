@@ -421,7 +421,30 @@ phylo_joined_lowcounts_Firmicutes= subset_taxa(phylo_joined_lowcounts,Phylum=="F
 plot_bar(phylo_joined_lowcounts_Actino, fill="Family")
 plot_bar(phylo_joined_lowcounts_Firmicutes, fill="Family")
 
-deseqobj_full = phyloseq_to_deseq2(phylo_joined, ~1)
+
+phylo_joined@sam_data$RemainingReads = colSums(phylo_joined@otu_table@.Data)
+plotting_DF = data.frame(phylo_joined@sam_data)
+patient_mapping32_subset = patient_mapping32 %>% select(SampleID,SubjectID)
+patient_mapping35_subset = patient_mapping35 %>% select(SampleID, SubjectID)
+patientmapping = rbind(patient_mapping32_subset, patient_mapping35_subset)
+
+woundTypeInfo = patient_metadata %>% select(SubjectID, wound_type)
+patientmapping = patientmapping %>% left_join(woundTypeInfo, by="SubjectID")
+plotting_DF = plotting_DF %>% left_join(patientmapping, by="SampleID")
+
+
+plotting_DF = plotting_DF %>% mutate(WoundDescription = case_when(wound_type == 1 ~ "PressureUlcer",
+                                                                            wound_type==2 ~ "VenousUlcer",
+                                                                            wound_type==3 ~"ArterialUlcer",
+                                                                            wound_type==4 ~ "Surgical", 
+                                                                            wound_type==5 ~ "Traumatic",
+                                                                            wound_type==6 ~ "MixedTraumaticSurgical",
+                                                                            TRUE ~ "Other"))
+
+plottingDF = ggplot(plotting_DF, aes(x=WoundDescription, y=RemainingReads, group=WoundDescription, fill=WoundDescription)) + geom_boxplot() + facet_grid(.~Run) + scale_fill_manual(values=rev(ampalette))
+ggsave(plottingDF, file="ComparingFinalOTUcounts_RunType.pdf")
+
+deseqobj_full = phyloseq_to_deseq2(phylo_joined)
 
 save(deseqobj_full, file="data/DESeqObject21.rda")
 
@@ -439,7 +462,7 @@ gmeans = apply(counts(deseqobj), 1, get_geometric_means)
 # 
  disp_estimates = estimateDispersions(estimates_sizes)
  
- v_stabilized = getVarianceStabilizedData(disp_estimates)
+ v_stabilized = getVarianceStabilizedData(disp_estimates, blind=TRUE)
 # save(v_stabilized, file = "/home/acampbe/Club_Grice/scripts/acampbe/IowaWound/V_stabilized_IowaWound_Combined.rda")
 
 # Feel like I should plot sample sizes (depth) against type of wound to see if I should actually just use wound type as the factor for the VST transformation. 
