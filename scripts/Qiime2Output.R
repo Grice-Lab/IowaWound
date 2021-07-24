@@ -116,8 +116,8 @@ phylofull = subset_taxa(phylofull, Kingdom == "Bacteria")
 
 # Look at non-chimeric reads in each sample, characterized & uncharacterized
 #############################################################################
-denoise35 = denoise35 %>% select(sample.id, filtered, non.chimeric)
-denoise32 = denoise32 %>% select(sample.id, filtered, non.chimeric)
+denoise35 = denoise35 %>% select(sample.id, filtered, non.chimeric, input)
+denoise32 = denoise32 %>% select(sample.id, filtered, non.chimeric, input)
 
 # Look at proportions of 
 phylo32@sam_data$Reads = colSums(phylo32@otu_table@.Data)
@@ -126,8 +126,8 @@ phylo35@sam_data$Reads = colSums(phylo35@otu_table@.Data)
 samdata32 = data.frame(phylo32@sam_data) %>% filter(ControlStatus=="NonControl")
 samdata35 = data.frame(phylo35@sam_data) %>% filter(ControlStatus=="NonControl")
 
-colnames(denoise32) = c("SampleID", "Filtered", "NonChimeric")
-colnames(denoise35) = c("SampleID", "Filtered", "NonChimeric")
+colnames(denoise32) = c("SampleID", "Filtered", "NonChimeric","input")
+colnames(denoise35) = c("SampleID", "Filtered", "NonChimeric","input")
 
 samdata32 = samdata32 %>% left_join(denoise32, by="SampleID")
 samdata35 = samdata35 %>% left_join(denoise35, by="SampleID")
@@ -153,13 +153,14 @@ chimeras32melt = samdata32 %>% select(SampleID, Chimeric, NonChimeric, wound_typ
 chimeras32 = ggplot(chimeras32melt, aes(x=SampleID, y=value, fill=variable))+ geom_bar(aes(fill=variable), stat="identity")
 chimeras32_order = chimeras32melt %>% filter(variable=="NonChimeric") %>% arrange(wound_type, value)
 chimeras32$data$SampleID = factor(chimeras32$data$SampleID, levels=chimeras32_order$SampleID)
-chimeras32 = chimeras32 + theme_classic() + scale_fill_manual(values=twocolor) +theme(axis.text.x=element_blank()) + xlab("") + ggtitle("Run 32 Chimeric Reads")
+chimeras32 = chimeras32 + theme_classic() + scale_fill_manual(values=twocolor) +theme(axis.text.x=element_blank()) + xlab("") + ggtitle("Run 32 Chimeric Reads") + ylim(c(0, 170000))
+
 
 chimeras35melt = samdata35 %>% select(SampleID, Chimeric, NonChimeric, wound_type) %>% reshape2::melt(id.vars=c("SampleID", "wound_type"))
 chimeras35 = ggplot(chimeras35melt, aes(x=SampleID, y=value, fill=variable))+ geom_bar(aes(fill=variable), stat="identity")
 chimeras35_order = chimeras35melt %>% filter(variable=="NonChimeric") %>% arrange(wound_type, value)
 chimeras35$data$SampleID = factor(chimeras35$data$SampleID, levels=chimeras35_order$SampleID)
-chimeras35 = chimeras35 + theme_classic() + scale_fill_manual(values=twocolor) +theme(axis.text.x=element_blank()) + xlab("") + ggtitle("Run 35 Chimeric Reads")
+chimeras35 = chimeras35 + theme_classic() + scale_fill_manual(values=twocolor) +theme(axis.text.x=element_blank()) + xlab("") + ylim(c(0, 170000))+ ggtitle("Run 35 Chimeric Reads")
 ggsave(gridExtra::grid.arrange(chimeras32, chimeras35), file="ChimericReads.pdf")
 
 # Plot of proportion reads mapped 
@@ -171,8 +172,57 @@ samdata35$Characterized =  samdata35$Reads
 characterized32 = samdata32 %>% select(SampleID, Uncharacterized, Characterized, wound_type) %>% reshape2::melt(id.vars=c("SampleID", "wound_type"))
 characterized35 = samdata35 %>% select(SampleID, Uncharacterized, Characterized, wound_type) %>% reshape2::melt(id.vars=c("SampleID", "wound_type"))
 
+characterizedplot32 = ggplot(characterized32, aes(fill=variable,y=value,x=SampleID)) + geom_bar(stat="identity") + theme_classic() + scale_fill_manual(values=twocolor) +theme(axis.text.x=element_blank()) + xlab("") + ylim(c(0, 170000))+ ggtitle("Run 32 Characterized Non-chimeric Reads")
+characterizedplot35 = ggplot(characterized35, aes(fill=variable, y=value, x=SampleID)) + geom_bar(stat="identity") + theme_classic() + scale_fill_manual(values=twocolor) +theme(axis.text.x=element_blank()) + xlab("") + ylim(c(0, 170000))+ ggtitle("Run 35 Characterized Non-chimeric Reads")
 
-#%>% select(SampleID, Chimeric, NonChimeric, wound_type) %>% reshape2::melt(id.vars=c("SampleID", "wound_type"))
+characterizedplot32Order = (characterized32 %>% filter(variable=="Characterized") %>% arrange(wound_type, value))$SampleID
+characterizedplot32$data$SampleID = factor(characterizedplot32$data$SampleID, levels=characterizedplot32Order)
+
+characterizedplot35Order = (characterized35 %>% filter(variable=="Characterized") %>% arrange(wound_type, value))$SampleID
+characterizedplot35$data$SampleID = factor(characterizedplot35$data$SampleID, levels=characterizedplot35Order)
+
+ggsave(gridExtra::grid.arrange(characterizedplot32, characterizedplot35), file="UncharacterizedReads.pdf")
+
+
+
+# Actual filtration step 
+# Filtered out
+samdata32$input = sapply(samdata32$input, function(x) as.numeric(as.character(x)))
+samdata32$Removed = samdata32$input - samdata32$Filtered
+samdata35$input = sapply(samdata35$input, function(x) as.numeric(as.character(x)))
+samdata35$Removed = samdata35$input - samdata35$Filtered
+samdata32$Kept = samdata32$Filtered
+samdata35$Kept = samdata35$Filtered
+
+Filtered32 = samdata32 %>% select(SampleID, Kept, Removed, wound_type) %>% reshape2::melt(id.vars=c("SampleID", "wound_type"))
+Filtered35 = samdata35 %>% select(SampleID, Kept, Removed, wound_type) %>% reshape2::melt(id.vars=c("SampleID", "wound_type"))
+
+
+filterplot32 =  ggplot(Filtered32, aes(fill=variable,y=value,x=SampleID)) + geom_bar(stat="identity") + theme_classic() + scale_fill_manual(values=twocolor) +theme(axis.text.x=element_blank()) + xlab("") + ggtitle("Run 32 Raw Read Filtering/Denoising") + ylim(c(0,250000))
+filterplot32$data$variable = factor(filterplot32$data$variable,levels=c("Removed", "Kept"))
+
+filterplot35 =  ggplot(Filtered35, aes(fill=variable,y=value,x=SampleID)) + geom_bar(stat="identity") + theme_classic() + scale_fill_manual(values=twocolor) +theme(axis.text.x=element_blank()) + xlab("") + ggtitle("Run 35 Raw Read Filtering/Denoising")+ ylim(c(0,250000))
+filterplot32$data$variable = factor(filterplot32$data$variable,levels=c("Removed", "Kept"))
+filterplot35$data$variable = factor(filterplot35$data$variable,levels=c("Removed", "Kept"))
+
+filterplot32_Order = (filterplot32$data %>% filter(variable=="Kept") %>% arrange(wound_type, value))$SampleID
+filterplot35_Order = (filterplot35$data %>% filter(variable=="Kept") %>% arrange(wound_type, value))$SampleID
+
+filterplot32$data$SampleID = factor(filterplot32$data$SampleID, levels=filterplot32_Order)
+filterplot35$data$SampleID = factor(filterplot35$data$SampleID, levels=filterplot35_Order)
+
+ggsave(gridExtra::grid.arrange(filterplot32, filterplot35, ncol=2), file="ReadFiltering.pdf", height=7, width=15)
+
+# Compare the final pre-decontam reads together by run and wound type 
+bigframe = rbind(samdata32, samdata35)
+bigframe = bigframe %>% mutate(WoundDescription = case_when(wound_type == 1 ~ "PressureUlcer",
+                                                            wound_type==2 ~ "VenousUlcer",
+                                                            wound_type==3 ~"ArterialUlcer",
+                                                            wound_type==4 ~ "Surgical", 
+                                                            wound_type==5 ~ "Traumatic",
+                                                            wound_type==6 ~ "MixedTraumaticSurgical",
+                                                            TRUE ~ "Other"))
+ggplot(bigframe, aes(x=WoundDescription, y=Reads, group=WoundDescription)) + geom_boxplot() + facet_grid(.~Run)
 
 
 
@@ -184,6 +234,7 @@ phylo35_original = sample_names(phylo35)
 
 phylo32@sam_data$Reads <- colSums(phylo32@otu_table@.Data)
 phylo35@sam_data$Reads <- colSums(phylo35@otu_table@.Data)
+
 
 # 217 - 208 = 9 removed from run 32
 # 233 - 155 = 78 removed from run 35
