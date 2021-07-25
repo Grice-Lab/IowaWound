@@ -7,6 +7,9 @@ library("dplyr")
 library("stringr")
 library("decontam")
 library("ggplot2")
+library("DESeq2")
+library("vegan")
+library("ggpubr")
 setwd("~/Desktop/GriceLabGit/IowaWound/")
 ampalette <- rev(c("#B85C00","#999999","#339966","#6B24B2","#56B4E9","#D119A3","#006600", "#CC0000", 
                    "#4D4D4D", "#F0E442", "#CC99FF","#663300","#33CC33", "#0072B2", "#FF9900", 
@@ -263,9 +266,11 @@ patient_metadata = patient_metadata %>% mutate(WoundDescription = case_when(woun
                                                          wound_type==6 ~ "MixedTraumaticSurgical",
                                                          TRUE ~ "Other"))
 
-ggplot(patient_metadata, aes(Removed)) + aes(x=Removed, fill=WoundDescription) + geom_bar() + scale_fill_manual(values=rev(ampalette)) + xlab("") + ylab("Count total") + ggtitle("Depth-removed samples by\ntotal count")
+depthremoved1 = ggplot(patient_metadata, aes(Removed)) + aes(x=Removed, fill=WoundDescription) + geom_bar() + scale_fill_manual(values=rev(ampalette)) + xlab("") + ylab("Count total") + ggtitle("Depth-removed samples by\ntotal count")
 
-ggplot(patient_metadata, aes(Removed)) + aes(x=Removed, fill=WoundDescription) + geom_bar(position="fill") + scale_fill_manual(values=rev(ampalette)) + xlab("") + ylab("Proportion total") + ggtitle("Depth-removed samples by proportion")
+depthremoved2 = ggplot(patient_metadata, aes(Removed)) + aes(x=Removed, fill=WoundDescription) + geom_bar(position="fill") + scale_fill_manual(values=rev(ampalette)) + xlab("") + ylab("Proportion total") + ggtitle("Depth-removed samples by proportion")
+
+ggsave(gridExtra::grid.arrange(depthremoved1, depthremoved2, ncol=2), file="depth_removed.pdf", width=11, height=7)
 
 ################################################################
 # Process decontamination for MiSeqV1V3_32 --> phylo32_filtered
@@ -275,7 +280,7 @@ ggplot(patient_metadata, aes(Removed)) + aes(x=Removed, fill=WoundDescription) +
 #########################################################################
 Controls32 = subset_samples(phylo32, ControlStatus!="NonControl")
 Controls32@sam_data$Sample_Ctrl = paste(Controls32@sam_data$SampleID, Controls32@sam_data$ControlStatus, sep="_")
-plot_bar(Controls32, "Sample_Ctrl", fill="Phylum") + scale_fill_manual(values=ampalette)
+plot_bar(Controls32, "Sample_Ctrl", fill="Phylum") + scale_fill_manual(values=ampalette) + ggtitle("OTUs of phyla in MiSeqV1V3_32 controls")
 
 # Remove mock for just negative ctrls
 Negatives32 = subset_samples(Controls32, SampleID!="120602")
@@ -335,7 +340,7 @@ Remove_from_Both = ExtractionControls_Positive$OTU
 Controls35 = subset_samples(phylo35, ControlStatus!="NonControl")
 # ignore empty wells
 Controls35 = subset_samples(Controls35, ControlStatus!="Empty")
-plot_bar(Controls35, "SampleID", fill="Phylum") + scale_fill_manual(values=ampalette) + ggtitle("Run 35 Water Control Phyla")
+waterphyla35 = plot_bar(Controls35, "SampleID", fill="Phylum") + scale_fill_manual(values=ampalette) + ggtitle("Run 35 Water Control Phyla")
 
 Controls35_Firmicutes = subset_taxa(Controls35, Phylum=="Firmicutes")
 Controls35_FirmicutesAbundance =  transform_sample_counts(Controls35_Firmicutes, function(x) x / sum(x) )
@@ -343,7 +348,9 @@ Controls35_FirmicutesAbundance@otu_table@.Data[,c("DNAfreewater1", "DNAfreewater
 Controls35_Firmicutes_abundance_keep = filter_taxa(Controls35_FirmicutesAbundance, function(x) mean(x) > 1e-5, TRUE)
 Controls35_Firmicutes = prune_taxa(taxa_names(Controls35_Firmicutes_abundance_keep), Controls35_Firmicutes)
 
-plot_bar(Controls35_Firmicutes, "SampleID", fill="Genus") + scale_fill_manual(values=ampalette) + ggtitle("Run 35 Water Control Genera in Firmicutes")
+watergenerafirm35 = plot_bar(Controls35_Firmicutes, "SampleID", fill="Genus") + scale_fill_manual(values=ampalette) + ggtitle("Run 35 Water Control Genera in Firmicutes")
+
+ggsave(gridExtra::grid.arrange(waterphyla35, watergenerafirm35, ncol=2), file="Controls35_contents.pdf",width=13, height=7)
 
 # Prevalence-based contaminant identification
 #############################################
@@ -434,21 +441,42 @@ plotting_DF = plotting_DF %>% left_join(patientmapping, by="SampleID")
 
 
 plotting_DF = plotting_DF %>% mutate(WoundDescription = case_when(wound_type == 1 ~ "PressureUlcer",
-                                                                            wound_type==2 ~ "VenousUlcer",
-                                                                            wound_type==3 ~"ArterialUlcer",
-                                                                            wound_type==4 ~ "Surgical", 
-                                                                            wound_type==5 ~ "Traumatic",
-                                                                            wound_type==6 ~ "MixedTraumaticSurgical",
-                                                                            TRUE ~ "Other"))
+                                                                  wound_type==2 ~ "VenousUlcer",
+                                                                  wound_type==3 ~"ArterialUlcer",
+                                                                  wound_type==4 ~ "Surgical", 
+                                                                  wound_type==5 ~ "Traumatic",
+                                                                  wound_type==6 ~ "MixedTraumaticSurgical",
+                                                                  TRUE ~ "Other"))
 
 plottingDF = ggplot(plotting_DF, aes(x=WoundDescription, y=RemainingReads, group=WoundDescription, fill=WoundDescription)) + geom_boxplot() + facet_grid(.~Run) + scale_fill_manual(values=rev(ampalette))
-ggsave(plottingDF, file="ComparingFinalOTUcounts_RunType.pdf")
 
-deseqobj_full = phyloseq_to_deseq2(phylo_joined)
+plot_richness(phylo_joined, measures=c("Shannon"), x="Run") + theme_classic()
 
+plot_richness(phylo_joined, x="Run", measures=c("Observed", "Simpson", "Shannon", "InvSimpson"))+ geom_boxplot() + theme_classic() + stat_compare_means(method = "kruskal.test")
+
+# Beta diversity between the runs; 
+# Can't reject null that dispersions are the same between the runs
+
+beta <- betadisper(braycurtis_run, phylo_joined@sam_data$Run)
+permutest(beta)
+
+
+braycurtis_run = phyloseq::distance(phylo_joined, method = "bray")
+ordinationbray = ordinate(phylo_joined, method="PCoA", distance=braycurtis_run)
+plot_ordination(phylo_joined, ordinationbray, color="Run") + theme(aspect.ratio=1)
+
+
+
+
+plot_richness(phylo_joined, x="Run", measures=c("Observed", "Simpson", "Shannon", "InvSimpson"))+ theme_classic() +  geom_boxplot() + stat_compare_means(method = "t.test", label.x=1.2)
+
+
+rggsave(plottingDF, file="ComparingFinalOTUcounts_RunType.pdf", width=14, height=7)
+
+deseqobj_full = phyloseq_to_deseq2(phylo_joined, .~Run) 
 save(deseqobj_full, file="data/DESeqObject21.rda")
 
- deseqobj = deseqobj_full
+deseqobj = deseqobj_full
 get_geometric_means <- function(x){
   mean = exp(sum(log(x[x>0]), na.rm=TRUE) / length(x))
    return(mean)
