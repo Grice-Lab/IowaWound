@@ -324,6 +324,7 @@ intersect(contaminants_prevalence$ID, ExtractionControls_Positive$OTU)
 
 # Filter based on findings
 ##########################
+Remove32_Prevalence = contaminants_allNegativeControls$ID
 TaxaToKeep = setdiff(taxa_names(phylo32),contaminants_allNegativeControls$ID)
 phylo32_filtered = subset_samples(phylo32, ControlStatus == "NonControl")
 phylo32_filtered = prune_taxa(TaxaToKeep, phylo32_filtered)
@@ -360,6 +361,8 @@ contaminants_prevalence35 = isContaminant(phylo35, method="prevalence", neg="is.
 contaminants_prevalence35$ID = row.names(contaminants_prevalence35)
 contaminants_prevalence35 = contaminants_prevalence35 %>% left_join(taxonomy_map_contams,by="ID")
 OTUs_Remove_prevalence35 = (contaminants_prevalence35 %>% filter(contaminant))$ID
+
+Remove35_Prevalence = OTUs_Remove_prevalence35
 
 # Concentration-based contaminant identification
 ################################################
@@ -401,6 +404,31 @@ phylo_joined = merge_phyloseq(phylo32_filtered, phylo35_filtered)
 otunames = rownames(phylo_joined@otu_table)
 sampnames = colnames(phylo_joined@otu_table)
 
+# Strict filtering
+###################
+# Lists of removed OTUs
+# Test stricter phylojoin version where you remove all OTUs removed from either from both 
+Remove35_Prevalence
+Remove32_Prevalence
+OTUs_Remove_concentration35
+AllContaminants = c(OTUs_Remove_concentration35, c(Remove35_Prevalence, Remove32_Prevalence))
+
+# phylo_joined_STRICT = prune_taxa(setdiff(taxa_names(phylo_joined@otu_table), AllContaminants), phylo_joined)
+# phylo_joined_relabundance_STRICT = transform_sample_counts(phylo_joined_STRICT, function(x) x / sum(x) )
+# OTU_table_full_STRICT= data.frame(phylo_joined_relabundance_STRICT@otu_table)
+# OTU_table_full_STRICT[is.na(OTU_table_full_STRICT)] <- 0 
+# OTU_table_full_STRICT[OTU_table_full_STRICT < .001 ] <- 0
+# OTU_table_full_STRICT$Prevalence <- apply(OTU_table_full_STRICT, 1, function(x) sum(x>0))
+# OTU_table_full_STRICT  = subset(OTU_table_full_STRICT, Prevalence >=1 )
+# OTU_table_full_STRICT$Prevalence = NULL
+# OTUs_keep_prevalence_STRICT = rownames(OTU_table_full_STRICT)
+# phylo_joined_STRICT = prune_taxa(OTUs_keep_prevalence_STRICT, phylo_joined_STRICT)
+# 
+# braycurtis_run_STRICT = phyloseq::distance(phylo_joined_STRICT, method = "bray")
+# ordinationbray_STRICT = ordinate(phylo_joined_STRICT, method="PCoA", distance=braycurtis_run_STRICT)
+# plot_ordination(phylo_joined_STRICT, ordinationbray_STRICT, color="Run") + theme(aspect.ratio=1) + scale_color_manual(values=twocolor)
+# plot_ordination(phylo_joined_STRICT, ordinationbray_STRICT, color="Run") + theme(aspect.ratio=1) + scale_color_manual(values=wound_type)
+
 
 phylo_joined_relabundance = transform_sample_counts(phylo_joined, function(x) x / sum(x) )
 OTU_table_full = data.frame(phylo_joined_relabundance@otu_table)
@@ -429,6 +457,9 @@ plot_bar(phylo_joined_lowcounts_Actino, fill="Family")
 plot_bar(phylo_joined_lowcounts_Firmicutes, fill="Family")
 
 
+
+phylojoined_backup_prefilter = phylojoined
+
 phylo_joined@sam_data$RemainingReads = colSums(phylo_joined@otu_table@.Data)
 plotting_DF = data.frame(phylo_joined@sam_data)
 patient_mapping32_subset = patient_mapping32 %>% select(SampleID,SubjectID)
@@ -452,8 +483,6 @@ plottingDF = ggplot(plotting_DF, aes(x=WoundDescription, y=RemainingReads, group
 
 plot_richness(phylo_joined, measures=c("Shannon"), x="Run") + theme_classic()
 
-plot_richness(phylo_joined, x="Run", measures=c("Observed", "Simpson", "Shannon", "InvSimpson"))+ geom_boxplot() + theme_classic() + stat_compare_means(method = "kruskal.test")
-
 # Beta diversity between the runs; 
 # Can't reject null that dispersions are the same between the runs
 
@@ -463,17 +492,17 @@ permutest(beta)
 
 braycurtis_run = phyloseq::distance(phylo_joined, method = "bray")
 ordinationbray = ordinate(phylo_joined, method="PCoA", distance=braycurtis_run)
-plot_ordination(phylo_joined, ordinationbray, color="Run") + theme(aspect.ratio=1)
+plot_ordination(phylo_joined, ordinationbray, color="Run") + theme(aspect.ratio=1) + scale_color_manual(values=twocolor)
+plot_ordination(phylo_joined, ordinationbray, color="Run") + theme(aspect.ratio=1) + scale_color_manual(values=wound_type)
 
-
-
+  
 
 plot_richness(phylo_joined, x="Run", measures=c("Observed", "Simpson", "Shannon", "InvSimpson"))+ theme_classic() +  geom_boxplot() + stat_compare_means(method = "t.test", label.x=1.2)
 
 
-rggsave(plottingDF, file="ComparingFinalOTUcounts_RunType.pdf", width=14, height=7)
+ ggsave(plottingDF, file="ComparingFinalOTUcounts_RunType.pdf", width=14, height=7)
 
-deseqobj_full = phyloseq_to_deseq2(phylo_joined, .~Run) 
+deseqobj_full= phyloseq_to_deseq2(phylo_joined, ~1) 
 save(deseqobj_full, file="data/DESeqObject21.rda")
 
 deseqobj = deseqobj_full
@@ -490,8 +519,107 @@ gmeans = apply(counts(deseqobj), 1, get_geometric_means)
 # 
  disp_estimates = estimateDispersions(estimates_sizes)
  
- v_stabilized = getVarianceStabilizedData(disp_estimates, blind=TRUE)
-# save(v_stabilized, file = "/home/acampbe/Club_Grice/scripts/acampbe/IowaWound/V_stabilized_IowaWound_Combined.rda")
+ v_stabilized = getVarianceStabilizedData(disp_estimates)
+ 
 
-# Feel like I should plot sample sizes (depth) against type of wound to see if I should actually just use wound type as the factor for the VST transformation. 
-sessionInfo()
+ save(v_stabilized, file="data/V_stabilized_IowaWound_Combined_2021.rda")
+ 
+####################
+# Post-normalization
+####################
+ 
+# Set < 0 count values to 0 after the log transformation
+v_stabilized[v_stabilized < 0] <-  0 
+ 
+# Feed normalized data into the phyloseq object
+phylo_joined_postNorm = phylo_joined
+phylo_joined_postNorm@otu_table = otu_table(v_stabilized, taxa_are_rows = T)
+
+pre_norm_relative = transform_sample_counts(phylo_joined, function(x) x / sum(x) )
+
+pre_norm = plot_bar(pre_norm_relative , "SampleID", fill="Phylum") + scale_fill_manual(values=ampalette)
+
+other_phyla = setdiff(unique(pre_norm$data$Phylum), c("Bacteroidota", "Proteobacteria","Actinobacteriota","Firmicutes"))
+phyla_order=c( other_phyla , "Bacteroidota","Proteobacteria","Actinobacteriota", "Firmicutes")
+
+pre_norm$data$Phylum = factor(pre_norm$data$Phylum,levels=phyla_order)
+
+
+pre_norm_data = phylo_joined %>% 
+  tax_glom(taxrank = "Phylum") %>%
+  transform_sample_counts(function(x) {x/sum(x)}) %>% 
+  psmelt() %>% 
+  group_by(Phylum) 
+
+PRENormPalette = unique(rev(c("#B85C00","#999999","#339966","#6B24B2","#4D4D4D", "#CC0000", 
+                       "#CC99FF","#663300","#33CC33", "#0072B2",  
+                       "#9900FF","#B85C00","#339966","#6B24B2","#56B4E9","#992900","#006600", 
+                       "#4D4D4D", "#0072B2","#FF9900")))
+
+Palette17 = c("blue4","aquamarine4","coral1", "darkgoldenrod1", "brown4","darkgreen", "darkolivegreen3","dodgerblue2", "darksalmon","mediumpurple4","lightseagreen", "tan2", "paleturquoise", "yellow1", "maroon4", "palevioletred2", "orange4")
+
+prenorm_plot = ggplot(pre_norm_data, aes(x=Sample, y=Abundance, fill=Phylum)) + geom_bar(stat="identity")  +
+  ggtitle("Phylum-Level Composition of Pre-normalized MiSeq_32 and 35 Samples Combined (Grouped by MiSeq Run)") + theme_classic()+
+  theme(axis.text.x=element_blank(), legend.title=element_text(size=14), legend.text=element_text(size=12), legend.key.size = unit(.8, "cm")) + 
+  scale_fill_manual(values=rev(Palette17)) 
+
+SampleOrder = unique((prenorm_plot$data %>% filter(Phylum=="Firmicutes") %>% arrange(Run, Abundance))$Sample)
+
+prenorm_plot$data$Sample = factor(prenorm_plot$data$Sample, levels=SampleOrder)
+prenorm_plot$data$Phylum = factor(prenorm_plot$data$Phylum, levels=phyla_order)
+
+
+post_norm_data = phylo_joined_postNorm %>% 
+  tax_glom(taxrank = "Phylum") %>%
+  transform_sample_counts(function(x) {x/sum(x)}) %>% 
+  psmelt() %>% 
+  group_by(Phylum) 
+
+
+postnorm_plot = ggplot(post_norm_data, aes(x=Sample, y=Abundance, fill=Phylum)) + geom_bar(stat="identity")  +
+  ggtitle("Phylum-Level Composition of Normalized MiSeq_32 and 35 Samples Combined (Grouped by MiSeq Run)") + theme_classic()+
+  theme(axis.text.x=element_blank(), legend.title=element_text(size=14), legend.text=element_text(size=12), legend.key.size = unit(.8, "cm")) + 
+  scale_fill_manual(values=rev(Palette17)) 
+postnorm_plot$data$Sample = factor(postnorm_plot$data$Sample, levels=SampleOrder)
+postnorm_plot$data$Phylum = factor(postnorm_plot$data$Phylum, levels=phyla_order)
+
+legend <- cowplot::get_legend(
+  # create some space to the left of the legend
+  postnorm_plot 
+)
+
+postnorm_plot = postnorm_plot + theme(legend.position="none")
+prenorm_plot = prenorm_plot + theme(legend.position="none")
+gridExtra::grid.arrange(prenorm_plot, postnorm_plot, nrow=2)
+
+TwoPlots = cowplot::plot_grid(prenorm_plot, postnorm_plot, nrow=2)
+combinedplots = cowplot::plot_grid(TwoPlots, legend, rel_widths = c(20, 2))  
+
+prenormOrdination= ordinate(phylo_joined, "PCoA", "bray")
+
+PreNormBrayPlot = plot_ordination(phylo_joined, prenormOrdination, color="Run") + 
+  ggtitle("Bray Curtis-based PCoA Coordinates 1 and 2 (Pre-normalization)") + scale_color_manual(values=twocolor) + geom_point(size=2) 
+
+
+postnormOrdination= ordinate(phylo_joined_postNorm, "PCoA", "bray")
+PostNormBrayPlot = plot_ordination(phylo_joined_postNorm, postnormOrdination, color="Run") + 
+  ggtitle("Bray Curtis-based PCoA Coordinates 1 and 2(after VST normalization)") + scale_color_manual(values=twocolor) + geom_point(size=2) 
+
+gridExtra::grid.arrange(PreNormBrayPlot, PostNormBrayPlot, nrow=2)
+
+#Pre_Batch_Plot + xlim(c(-.4,.45)) + ylim(c(-.4, .4))
+#  gmeans_runs = apply(counts(deseqobjRun), 1, get_geometric_means)
+#  # 
+#  estimates_sizes_run = estimateSizeFactors(deseqobjRun, geoMeans = gmeans_runs)
+#  # 
+#  disp_estimates_run = estimateDispersions(estimates_sizes_run)
+#  
+#  v_stabilized_run = getVarianceStabilizedData(disp_estimates_run)
+
+# # Compare what happens with and without a design factor
+# run = unlist(as.list(v_stabilized_run))
+# regular = unlist(as.list(v_stabilized))
+# 
+# df_plot = data.frame(run)
+# df_plot$regular = regular
+# ggplot(df_plot, aes(x=run, y=regular)) + geom_point()
