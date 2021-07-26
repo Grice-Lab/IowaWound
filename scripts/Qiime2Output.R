@@ -607,6 +607,16 @@ PostNormBrayPlot = plot_ordination(phylo_joined_postNorm, postnormOrdination, co
 
 gridExtra::grid.arrange(PreNormBrayPlot, PostNormBrayPlot, nrow=2)
 
+
+genus_level =  phylo_joined_postNorm %>% 
+  tax_glom(taxrank = "Genus") 
+postnormOrdinationGenus= ordinate(genus_level, "PCoA", "bray")
+PostNormBrayPlotGenus = plot_ordination(genus_level, postnormOrdinationGenus, color="Run") + 
+  ggtitle("Bray Curtis-based PCoA Coordinates 1 and 2(genus-aggregated)") + scale_color_manual(values=twocolor) + geom_point(size=2) 
+
+gridExtra::grid.arrange(PostNormBrayPlot, PostNormBrayPlotGenus)
+  
+
 #Pre_Batch_Plot + xlim(c(-.4,.45)) + ylim(c(-.4, .4))
 #  gmeans_runs = apply(counts(deseqobjRun), 1, get_geometric_means)
 #  # 
