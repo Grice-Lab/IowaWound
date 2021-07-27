@@ -39,6 +39,25 @@ row_object <- function(taxa_id){
   return(defaultlist)
 }
 
+Genus_code = function(tax_table_row){
+  if(tax_table_row[1,c("Genus")] !="NA"){
+    return(tax_table_row[1,c("Genus")])
+  }else if(tax_table_row[1,c("Family")] != "NA"){
+    return(paste(tax_table_row[1,c("Family")] , tax_table_row[1, c("Genus")], sep="_"))
+  }else if(tax_table_row[1, c("Order")] != "NA"){
+    return(paste(tax_table_row[1, c("Order")], paste(tax_table_row[1,c("Family")] , tax_table_row[1, c("Genus")], sep="_"), sep="_"))
+  }else if(tax_table_row[1, c("Class")]!="NA"){
+    return(paste(tax_table_row[1, c("Class")],paste(tax_table_row[1, c("Order")], paste(tax_table_row[1,c("Family")] , tax_table_row[1, c("Genus")], sep="_"), sep="_"), sep="_"))
+  }else if(tax_table_row[1, c("Phylum")]!="NA"){
+    return(paste(tax_table_row[1, c("Phylum")], paste(tax_table_row[1, c("Class")],paste(tax_table_row[1, c("Order")], paste(tax_table_row[1,c("Family")] , tax_table_row[1, c("Genus")], sep="_"), sep="_"), sep="_"), sep="_"))
+  }else if(tax_table_row[1, c("Phylum")]=="NA"){
+    print("ouch")
+    return("NULL")
+  }else{
+    return("NULL")
+  }
+}
+
 # Read in data & metadata 
 OTU_Table = read.csv2("data/table.from_biom_w_taxonomy.txt", header=T, sep="\t",skip=1)
 controls_run = read.csv2("mappings/Control_Run_Info.tsv", header=T, sep=" ")
@@ -237,6 +256,36 @@ phylo35_original = sample_names(phylo35)
 
 phylo32@sam_data$Reads <- colSums(phylo32@otu_table@.Data)
 phylo35@sam_data$Reads <- colSums(phylo35@otu_table@.Data)
+
+
+# Before any decontamination
+#############################
+phylofull@sam_data$Reads = colSums(phylofull@otu_table@.Data)
+phylofull = subset_samples(phylofull, ( Reads >1000))
+
+phylofullOTUdf = data.frame(rowSums(phylofull@otu_table@.Data))
+colnames(phylofullOTUdf) = c("Sum")
+phylofullOTUdfKeep = phylofullOTUdf %>% filter(Sum > 10)
+phylofull = prune_taxa(row.names(phylofullOTUdfKeep), phylofull)
+phylofull_ordination = ordinate(phylofull, "PCoA", "bray")
+colSums(phylofull@otu_table@.Data)
+phylofullPlot= plot_ordination(phylofull, phylofull_ordination, color="Run") + 
+  ggtitle("Bray Curtis-based PCoA Coordinates 1 and 2 (Before Decontamination)") + scale_color_manual(values=twocolor) + geom_point(size=3) 
+
+# Adding genus code 
+pre_Decontam_tax = phylofull@tax_table
+pre_Decontam_tax[is.na(pre_Decontam_tax)] <- "NA"
+tax_table(phylofull) <- pre_Decontam_tax
+PreDecontamGenusCode= sapply(rownames(phylofull@tax_table), function(x) Genus_code(phylofull@tax_table[x, ]))
+physeq_tax_preDecontam = data.frame(phylofull@tax_table)
+physeq_tax_preDecontam$GenusCode = PreDecontamGenusCode
+phylofull@tax_table = tax_table(physeq_tax_preDecontam)
+colnames(phylofull@tax_table) = colnames(physeq_tax_preDecontam)
+rownames(phylofull@tax_table) = rownames(physeq_tax_preDecontam)
+phylofullGenusCode = phylofull %>% tax_glom(taxrank="GenusCode")
+phylofull_ordination_GenusCode = ordinate(phylofullGenusCode, "PCoA", "bray")
+phylofullPlotGenuscode= plot_ordination(phylofullGenusCode, phylofull_ordination_GenusCode, color="Run") + 
+  ggtitle("Bray Curtis-based PCoA Coordinates 1 and 2 (Before Decontamination; Aggregated to Genus)") + scale_color_manual(values=twocolor) + geom_point(size=3) 
 
 
 # 217 - 208 = 9 removed from run 32
@@ -596,14 +645,13 @@ TwoPlots = cowplot::plot_grid(prenorm_plot, postnorm_plot, nrow=2)
 combinedplots = cowplot::plot_grid(TwoPlots, legend, rel_widths = c(20, 2))  
 
 prenormOrdination= ordinate(phylo_joined, "PCoA", "bray")
-
 PreNormBrayPlot = plot_ordination(phylo_joined, prenormOrdination, color="Run") + 
   ggtitle("Bray Curtis-based PCoA Coordinates 1 and 2 (Pre-normalization)") + scale_color_manual(values=twocolor) + geom_point(size=2) 
 
 
 postnormOrdination= ordinate(phylo_joined_postNorm, "PCoA", "bray")
 PostNormBrayPlot = plot_ordination(phylo_joined_postNorm, postnormOrdination, color="Run") + 
-  ggtitle("Bray Curtis-based PCoA Coordinates 1 and 2(after VST normalization)") + scale_color_manual(values=twocolor) + geom_point(size=2) 
+  ggtitle("Bray Curtis-based PCoA Coordinates 1 and 2(after VST normalization)") + scale_color_manual(values=twocolor) + geom_point(size=3) 
 
 gridExtra::grid.arrange(PreNormBrayPlot, PostNormBrayPlot, nrow=2)
 
@@ -615,7 +663,63 @@ PostNormBrayPlotGenus = plot_ordination(genus_level, postnormOrdinationGenus, co
   ggtitle("Bray Curtis-based PCoA Coordinates 1 and 2(genus-aggregated)") + scale_color_manual(values=twocolor) + geom_point(size=2) 
 
 gridExtra::grid.arrange(PostNormBrayPlot, PostNormBrayPlotGenus)
-  
+
+
+
+# Adding genus code 
+taxtablepost = phylo_joined_postNorm@tax_table
+taxtablepost[is.na(taxtablepost)] <- "NA"
+tax_table(phylo_joined_postNorm) <- taxtablepost
+Vstabilized_GenusCode= sapply(rownames(phylo_joined_postNorm@tax_table), function(x) Genus_code(phylo_joined_postNorm@tax_table[x, ]))
+physeq_tax = data.frame(phylo_joined_postNorm@tax_table)
+physeq_tax$GenusCode = Vstabilized_GenusCode
+phylo_joined_postNorm@tax_table = tax_table(physeq_tax)
+colnames(phylo_joined_postNorm@tax_table) = colnames(physeq_tax)
+rownames(phylo_joined_postNorm@tax_table) = rownames(physeq_tax)
+
+
+# Adding genus code 
+taxtablepre = phylo_joined@tax_table
+taxtablepre[is.na(taxtablepre)] <- "NA"
+tax_table(phylo_joined) <- taxtablepre
+PreNormGenusCode= sapply(rownames(phylo_joined@tax_table), function(x) Genus_code(phylo_joined@tax_table[x, ]))
+physeq_tax_pre = data.frame(phylo_joined@tax_table)
+physeq_tax_pre$GenusCode = PreNormGenusCode
+phylo_joined@tax_table = tax_table(physeq_tax_pre)
+colnames(phylo_joined@tax_table) = colnames(physeq_tax_pre)
+rownames(phylo_joined@tax_table) = rownames(physeq_tax_pre)
+
+
+
+
+genus_code_level =  phylo_joined_postNorm %>% 
+  tax_glom(taxrank = "GenusCode") 
+postnormOrdinationGenusCode= ordinate(genus_code_level, "PCoA", "bray")
+PostNormBrayPlotGenusCode = plot_ordination(genus_code_level, postnormOrdinationGenus, color="Run") + 
+  ggtitle("Bray Curtis-based PCoA Coordinates 1 and 2(genus-aggregated after VST Normalization)") + scale_color_manual(values=twocolor) + geom_point(size=3) 
+
+gridExtra::grid.arrange(PostNormBrayPlot, PostNormBrayPlotGenusCode)
+
+
+
+genus_code_level_prop =  phylo_joined_postNorm %>% 
+  tax_glom(taxrank = "GenusCode")  %>% 
+  transform_sample_counts(function(x) {x/sum(x)})
+postnormOrdinationGenusCode= ordinate(genus_code_level_prop, "PCoA", "bray")
+PostNormBrayPlotGenusCodeProp = plot_ordination(genus_code_level_prop, postnormOrdinationGenusCode, color="Run") + 
+  ggtitle("Bray Curtis-based PCoA Coordinates 1 and 2(genus-aggregated after VST Normalization)") + scale_color_manual(values=twocolor) + geom_point(size=3) 
+
+gridExtra::grid.arrange(PostNormBrayPlot, PostNormBrayPlotGenusCode)
+
+post_norm_unaggregatedPCA = prcomp(t(phylo_joined_postNorm@otu_table))
+post_norm_aggregatedPCA = prcomp(t(genus_code_level))
+
+
+phylo_joined_postNorm_32Only = subset_samples(phylo_joined_postNorm, Run=="MiSeqV1V3_32")
+phylo_joined_postNorm_35Only = subset_samples(phylo_joined_postNorm, Run=="MiSeqV1V3_35")
+
+
+
 
 #Pre_Batch_Plot + xlim(c(-.4,.45)) + ylim(c(-.4, .4))
 #  gmeans_runs = apply(counts(deseqobjRun), 1, get_geometric_means)
@@ -633,3 +737,4 @@ gridExtra::grid.arrange(PostNormBrayPlot, PostNormBrayPlotGenus)
 # df_plot = data.frame(run)
 # df_plot$regular = regular
 # ggplot(df_plot, aes(x=run, y=regular)) + geom_point()
+
