@@ -2,12 +2,12 @@
 # Makes manifest file for input into qiime 2 (2020.8)
 # specifically for MiSeqV1V3_32 run (qi's demultiplexed reads)
 
-pathdemux="/home/acampbe/IowaWoundData2021/MiSeqV1V3_32/demultiplexed/MiSeqV1V3_32_barcode_"
+pathdemux="/Users/amycampbell/Documents/IowaWoundData2021/MiSeqV1V3_32/demultiplexed/MiSeqV1V3_32_barcode_"
 extfwd="_1.fastq.gz"
 extrev="_2.fastq.gz"
-manifestpath="/home/acampbe/GitHub/IowaWound/mappings/Manifest32.tsv"
-mappingfile="/home/acampbe/GitHub/IowaWound/mappings/IA_woundpain_mapping_32_2021.csv"
-intermediates="/home/acampbe/GitHub/IowaWound/intermediates/"
+manifestpath="/Users/amycampbell/Desktop/GriceLabGit/IowaWound/mappings/Manifest32.tsv"
+mappingfile="/Users/amycampbell/Desktop/GriceLabGit/IowaWound/mappings/IA_woundpain_mapping_32_2021.csv"
+intermediates="/Users/amycampbell/Desktop/GriceLabGit/IowaWound/intermediates/"
 
 # Make folder for intermediate files
 ####################################
