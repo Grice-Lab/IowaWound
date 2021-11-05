@@ -10,30 +10,6 @@ library("ggplot2")
 
 setwd("~/Desktop/GriceLabGit/IowaWound/")
 
-Old32Stats = read.table("/Users/amycampbell/Documents/IowaWoundData2021/DenoiseStatsOLD32.tsv", skip=1)
-Old35Stats = read.table("/Users/amycampbell/Documents/IowaWoundData2021/DenoiseStatsOLD35.tsv", skip=1)
-
-colnames(Old32Stats) = c("Sample", "input", "filtered", "pct_input_pass_filter", "denoised", "merged", "pct_input_merged", "nonchimeric", "pct_nonchimeric")
-colnames(Old35Stats) = c("Sample", "input", "filtered", "pct_input_pass_filter", "denoised", "merged", "pct_input_merged", "nonchimeric", "pct_nonchimeric")
-
-New32Stats = read.table("/Users/amycampbell/Documents/IowaWoundData2021/Qiime2Data/DenoisingStats32.tsv", skip=1)
-New35Stats = read.table("/Users/amycampbell/Documents/IowaWoundData2021/Qiime2Data/DenoisingStats35.tsv", skip=1)
-colnames(New32Stats) = c("Sample", "input_new", "filtered_new", "pct_input_pass_filter_new", "denoised_new", "merged_new", "pct_input_merged_new", "nonchimeric_new", "pct_nonchimeric_new")
-colnames(New35Stats) = c("Sample", "input_new", "filtered_new", "pct_input_pass_filter_new", "denoised_new", "merged_new", "pct_input_merged_new", "nonchimeric_new", "pct_nonchimeric_new")
-
-
-Stats32 = Old32Stats %>% left_join(New32Stats, by="Sample")
-Stats35 = Old35Stats %>% left_join(New35Stats, by="Sample")
-
-ggplot(Stats32,aes(x=nonchimeric, y=nonchimeric_new)) + geom_point() +geom_abline(slope=1) + ggtitle("MiSeqV1V3_32 Filtered & Merged Nonchimeric Read Counts") + xlab("Old Run") + ylab("New Run")
-ggplot(Stats35,aes(x=nonchimeric, y=nonchimeric_new)) + geom_point() +geom_abline(slope=1) + ggtitle("MiSeqV1V3_35 Filtered & Merged Nonchimeric Read Counts") + xlab("Old Run") + ylab("New Run")
-
-
-ggplot(Stats32,aes(x=merged, y=merged_new)) + geom_point() +geom_abline(slope=1) + ggtitle("MiSeqV1V3_32 Filtered & Merged  Read Counts") + xlab("Old Run") + ylab("New Run")
-ggplot(Stats35,aes(x=merged, y=merged_new)) + geom_point() +geom_abline(slope=1) + ggtitle("MiSeqV1V3_35 Filtered & Merged Read Counts") + xlab("Old Run") + ylab("New Run")
-
-
-
 Miseq32_27 = read.table("/Users/amycampbell/Documents/IowaWoundData2021/Qiime2Data/DenoiseTest/MiSeqV1V3_32_denoising27.tsv", skip=1)
 colnames(Miseq32_27) = c("Sample", "input27", "filtered27", "pct_input_pass_filter27", "denoised27", "merged27", "pct_input_merged27", "nonchimeric27", "pct_nonchimeric27")
 
