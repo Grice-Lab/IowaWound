@@ -10,8 +10,8 @@
 
 qiime dada2 denoise-paired \
   --i-demultiplexed-seqs /Users/amycampbell/Documents/IowaWoundData2021/Qiime2Data/paired-end-demux32.qza \
-  --p-trunc-len-f 267 \
-  --p-trunc-len-r 257 \
+  --p-trunc-len-f 282 \
+  --p-trunc-len-r 247 \
   --o-table /Users/amycampbell/Documents/IowaWoundData2021/Qiime2Data/table32.qza \
   --o-representative-sequences /Users/amycampbell/Documents/IowaWoundData2021/Qiime2Data/rep-seqs32.qza \
   --o-denoising-stats /Users/amycampbell/Documents/IowaWoundData2021/Qiime2Data/denoising-stats32.qza

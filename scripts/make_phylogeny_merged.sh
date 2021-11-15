@@ -1,15 +1,13 @@
 #!/bin/bash
 # Amy Campbell
-# 06/2021
-
-source /home/acampbe/software/miniconda3/bin/activate Qiime2Env
+# Updated 11/2021
 
 
 # Make tree for downstream diversity analyses 
 qiime phylogeny align-to-tree-mafft-fasttree \
-  --i-sequences /home/acampbe/IowaWoundData/MergedRuns/rep-seqs-merged.qza \
-  --o-alignment /home/acampbe/IowaWoundData/MergedRuns/aligned-rep-seqs-merged.qza \
-  --o-masked-alignment /home/acampbe/IowaWoundData/MergedRuns/masked-aligned-rep-seqs-merged.qza \
-  --o-tree /home/acampbe/IowaWoundData/MergedRuns/unrooted-tree-merged.qza \
-  --o-rooted-tree /home/acampbe/IowaWoundData/MergedRuns/rooted-tree-merged.qza
+  --i-sequences /Users/amycampbell/Documents/IowaWoundData2021/Qiime2Data/rep-seqs-merged.qza \
+  --o-alignment /Users/amycampbell/Documents/IowaWoundData2021/Qiime2Data/aligned-rep-seqs-merged.qza \
+  --o-masked-alignment /Users/amycampbell/Documents/IowaWoundData2021/Qiime2Data/masked-aligned-rep-seqs-merged.qza \
+  --o-tree /Users/amycampbell/Documents/IowaWoundData2021/Qiime2Data/unrooted-tree-merged.qza \
+  --o-rooted-tree /Users/amycampbell/Documents/IowaWoundData2021/Qiime2Data/rooted-tree-merged.qza
 
