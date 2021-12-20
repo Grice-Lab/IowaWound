@@ -282,7 +282,7 @@ contaminantsOnly_prevalence35 = (contaminants_prevalence35taxa %>% filter(contam
 
 ToRemove35Prevalence=contaminantsOnly_prevalence35$ID
 
-# (4) Identify ASVs in MiSeqV1V3_35  to remove based on Frequency (DNA concentration)
+# (3) Identify ASVs in MiSeqV1V3_35  to remove based on Frequency (DNA concentration)
 ######################################################################################
  
 # Incorporate concentration info from club grice mapping file 
@@ -306,7 +306,7 @@ contaminants_frequency35taxa = contaminants_frequency35 %>% left_join(taxonomy_m
 
 ToRemove35Frequency=contaminants_frequency35taxa$ID
 
-# (5) Remove contaminant ASVs from each run in Phyloseq Object
+# (4) Remove contaminant ASVs from each run in Phyloseq Object
 ###############################################################
 
 Remove35 = c(ToRemove35Frequency, ToRemove35Prevalence)
@@ -316,11 +316,6 @@ allremoves = c(Remove35, Remove32)
 
 Run32Samples= Phylo32@sam_data$SampleID
 Run35Samples=Phylo35@sam_data$SampleID
-
-# # Zero out OTUs for removal in each run
-# PhyloseqObject@otu_table[Remove32, Run32Samples] <- 0
-# PhyloseqObject@otu_table[Remove35, Run35Samples] <- 0
-# commented out because instead I'm trying removing 
 
 KeepTaxa = row.names(PhyloseqObject@tax_table)
 KeepTaxa = setdiff(KeepTaxa, Remove32)
@@ -380,9 +375,10 @@ adonis(unifracdistsFilteredOTUPostDecontamGenus ~ Run, data=GenusLevelDF, permut
 
 PhyloseqObject = PhyloseqObject
 
+##########################################
+# Make sure 
+##########################################
 OTULevelDF = OTULevelDF %>% filter(ControlStatus!="Mock")
-
-
 
 patient_mapping32_select = patient_mapping32 %>% select(X.SampleID, SubjectID)
 patient_mapping32_select$SampleID = patient_mapping32_select$X.SampleID
@@ -458,3 +454,82 @@ sample_names(PhyloseqObject) = sampledataphyloseqobj$SampleID
 
 save(PhyloseqObject, file="PhyloSeqObjectPostDecontam.rda")
 
+
+# Average together OTU counts for 2 duplicated patients 
+########################################################
+PhyloseqObject@sam_data$study_id = factor(PhyloseqObject@sam_data$study_id)
+
+PhyloseqObject@sam_data$study_id = sapply(PhyloseqObject@sam_data$study_id, function(x) toString(x))
+
+PhyloseqObject_2728 = subset_samples(PhyloseqObject, study_id %in% c("27", "28"))
+PhyloseqObjectMerged = merge_samples(PhyloseqObject_2728, "study_id")
+
+PhyloseqObjectMerged@sam_data$SampleID = c("120361_120383","120362_120384")
+PhyloseqObjectMerged@sam_data$X.SampleID = c("120361_120383","120362_120384")
+sample_names(PhyloseqObjectMerged) = PhyloseqObjectMerged@sam_data$SampleID
+
+
+PhyloseqObjectMerged@sam_data$SubjectID = factor(PhyloseqObjectMerged@sam_data$study_id)
+PhyloseqObjectMerged@sam_data$Run = "MiSeqV1V3_32"
+PhyloseqObjectMerged@sam_data$ControlStatus="NonControl" 
+
+PhyloseqObjectUpdated = subset_samples(PhyloseqObject, !(study_id %in% c("27", "28")))
+PhyloseqObjectUpdated = merge_phyloseq(PhyloseqObjectUpdated, PhyloseqObjectMerged)
+View(PhyloseqObjectUpdated@sam_data)
+
+save(PhyloseqObjectUpdated, file="PhyloSeqObjectPostDecontamMerged.rda")
+
+PhyloseqObjectUpdated =  subset_taxa(PhyloseqObjectUpdated, Phylum!="NA")
+PhyloseqObjectUpdatedRelabundance = PhyloseqObjectUpdated %>% transform_sample_counts(function(x) {x/sum(x)})
+barplot_all = plot_bar(PhyloseqObjectUpdatedRelabundance, x="Sample", y="Abundance", fill="Phylum") + scale_fill_manual(values=randpalette32)
+
+
+
+df_phyla = PhyloseqObjectUpdated %>% 
+  tax_glom(taxrank = "Phylum") %>%
+  transform_sample_counts(function(x) {x/sum(x)}) %>%
+  psmelt() %>% 
+  filter(Abundance >.01) %>%
+  group_by(Phylum)
+
+
+
+
+
+dataframe_counts = data.frame(df_phyla)
+sampnames = (unique(dataframe_counts$Sample))
+
+dataframe_counts = dataframe_counts %>% filter(Phylum=="Firmicutes")
+
+# samples with 0 Firmicutes (or less than 1%; weird)
+zero = setdiff(sampnames,dataframe_counts$Sample)
+zero_32 =zero[!grepl("IowaWound", zero)]
+zero_35 =zero[grepl("IowaWound", zero)]
+
+dataframe_counts_32 = dataframe_counts %>% filter(Run=="MiSeqV1V3_32") %>% arrange(Abundance)
+samples32 = append(zero_32, dataframe_counts_32$Sample)
+
+dataframe_counts_35 = dataframe_counts %>% filter(Run=="MiSeqV1V3_35") %>% arrange(Abundance)
+samples35 = append(zero_35, dataframe_counts_35$Sample)
+Desired_order= append(samples32, samples35)
+View(df_phyla)
+
+plotPhyla = ggplot(df_phyla, aes(x=SampleID, y=Abundance, fill=Phylum)) + geom_bar(stat="identity") + ggtitle("Phylum-level composition by run, sorted by Firmicutes Abundance") + scale_fill_manual(values=randpalette32) + theme_minimal() + theme(axis.text.x=element_text(angle=90))
+
+plotPhyla$data$SampleID = factor(plotPhyla$data$Sample, levels =Desired_order)
+
+
+# NA strings:
+NAstrings = c("unidentified_marine",
+"uncultured_soil",
+"unidentified_eubacterium",
+"uncultured_organism", NA,
+"NA", "uncultured_microorganism",
+"uncultured_bacterium", "uncultured_candidate", "uncultured_compost",
+"unidentified", "uncultured_prokaryote", "uncultured_rumen", "wastewater_metagenome")
+
+taxes = data.frame(PhyloseqObjectUpdated@tax_table@.Data)
+sort(unique(taxes$Species))
+Specieslevel = tax_glom(PhyloseqObjectUpdated, taxrank= "Species", bad_empty = NAstrings)
+taxesspecies = data.frame(Specieslevel@tax_table@.Data)
+write.csv(taxesspecies, file="SpeciesLevelTaxTable.csv")
