@@ -177,7 +177,7 @@ PhyloseqObject@sam_data$TotalOTUs = colSums(OTU_tab@.Data)
 # Subset to just Bacteria first of all
 PhyloseqObject = subset_taxa(PhyloseqObject, Kingdom=="Bacteria" )
 
-
+PhyloseqObjectBackupInitial = PhyloseqObject
 PhyloseqObjectForUniFrac = subset_samples(PhyloseqObject,TotalOTUs > 0 )
 
 
@@ -324,7 +324,7 @@ PhyloseqObjectBackup = PhyloseqObject
 
 removed = prune_taxa(allremoves, PhyloseqObjectBackup)
  
-
+PhyloseqObjectBackup1 = PhyloseqObject
 PhyloseqObject = prune_taxa(KeepTaxa, PhyloseqObject)
 
 # Remove negative controls 
@@ -533,3 +533,4 @@ sort(unique(taxes$Species))
 Specieslevel = tax_glom(PhyloseqObjectUpdated, taxrank= "Species", bad_empty = NAstrings)
 taxesspecies = data.frame(Specieslevel@tax_table@.Data)
 write.csv(taxesspecies, file="SpeciesLevelTaxTable.csv")
+
