@@ -1,5 +1,5 @@
 # IowaWound
-Iowa Wound Pain analyses 2021
+Iowa Wound Pain analyses 2021-22
 
 # (1) Make manifest .tsv’s for important already-demultiplexed reads
 
