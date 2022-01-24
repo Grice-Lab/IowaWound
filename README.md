@@ -64,6 +64,17 @@ To maximize the filtered nonchimeric paired reads yielded from the denoising ste
 # (5) Denoising 
 
 
+## Input
+- IowaWoundData/MiSeqV1V3_35/paired-end-demux35.qza
+- IowaWoundData/MiSeqV1V3_32/paired-end-demux32.qza
+- Truncation lengths selected in step 4
+
+## Scripts
+- [denoise.sh](https://github.com/Grice-Lab/IowaWound/blob/master/scripts/TestDenoise.sh)
+
+## Output
+- IowaWoundData/MiSeqV1V3_32/denoising-stats32.qza
+- IowaWoundData/MiSeqV1V3_35/denoising-stats35.qza
 
 # (6) Visualizations of denoising output  
 ## Input
@@ -84,8 +95,25 @@ To maximize the filtered nonchimeric paired reads yielded from the denoising ste
 ## Scripts
 [summarize_denoise.sh](https://github.com/Grice-Lab/IowaWound/blob/master/scripts/summarize_denoise.sh)
 
+# (7) Filter and merge samples from the two runs 
+## Input
+- table32.qza
+  - [samples-to-keep-32.tsv](https://github.com/Grice-Lab/IowaWound/blob/master/mappings/samples-to-keep-32.tsv) 
+  - [samples-to-keep-35.tsv](https://github.com/Grice-Lab/IowaWound/blob/master/mappings/samples-to-keep-35.tsv)
+  - IowaWoundData/MiSeqV1V3_32/table32.qzv
+  - IowaWoundData/MiSeqV1V3_35/table35.qzv
+  - IowaWoundData/MiSeqV1V3_32/rep-seqs32.qzv
+  - IowaWoundData/MiSeqV1V3_35/rep-seqs35.qzv
+  
+## Output
+- IowaWoundData/Qiime2Data/rep-seqs-merged.qza
+- IowaWoundData/Qiime2Data/mergedtable.qza
+- 
+## Scripts
+[filter_merge.sh](https://github.com/Grice-Lab/IowaWound/blob/master/scripts/filter_merge.sh)
 
-# (7) Make phylogeny 
+
+# (8) Make phylogeny 
 ## Input
 - IowaWoundData/MiSeqV1V3_32/rep-seqs32.qza 
 - IowaWoundData/MiSeqV1V3_35/rep-seqs35.qza 
