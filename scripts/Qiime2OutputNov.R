@@ -10,16 +10,8 @@ library("DESeq2")
 library("vegan")
 library("ggpubr")
 library("RColorBrewer")
-
-# note about metadata:
-# Wound types
-# # 1 = Pressure ulcer
-# 2 = venous ulcer
-# 4 = surgical
-# 5 = traumatic 
-# 6 = Mixed (Traumatic + surgical)
-# 7 = Other
-
+library("cowplot")
+ampalette()
 randpalette32= c("#E6F5C9", "#BF5B17", "#33A02C", "#B3E2CD", "#66C2A5",
                  "#66A61E", "#FFD92F", "#FFFF33", "#666666", "#6A3D9A", "#F2F2F2",
                  "#A6CEE3", "#FC8D62", "#1F78B4", "#7570B3", "#B3B3B3", "#E41A1C",
@@ -28,6 +20,32 @@ randpalette32= c("#E6F5C9", "#BF5B17", "#33A02C", "#B3E2CD", "#66C2A5",
                  "#006400", "#0000B3","#681A1A", "#B300B3")
 
 
+randpalette18=c("#B300B3","#E6AB02",
+                "#0000B3","#006400",
+                "#A6761D","#1B9E77",
+                "#B3DE69","#FF7F00",
+                "#681A1A","#7570B3",
+                "#1F78B4","#F2A687",
+                "#A6CEE3","#6A3D9A",
+                "#666666","#FFFF33",
+                "#33A02C","#E6F5C9")
+
+randpalette23 = c("#B300B3","#E6AB02", "#BF5B17",
+                "#0000B3","#006400",
+                "#A6761D","#1B9E77",
+                "#B3DE69","#FF7F00","#66C2A5","#66A61E",
+                "#681A1A","#7570B3",
+                "#1F78B4", "#FFD92F", "#F2A687",
+                "#A6CEE3","#6A3D9A",
+                "#666666","#FFFF33",
+                "#33A02C","#D95F02", "#E6F5C9")
+
+
+casPalette3 <- rev(c("#B85C00","#999999","#339966","#6B24B2","#56B4E9","#4D4D4D","#006600", "#CC0000", 
+                     "#D119A3", "#F0E442", "#CC99FF","#663300","#33CC33", "#0072B2", "#FF9900", 
+                     "#9900FF","#B85C00","#999999","#339966","#6B24B2","#56B4E9","#D119A3","#006600", "#CC0000", 
+                     "#F0E442", "#CC99FF","#663300","#33CC33", "#0072B2", "#FF9900", 
+                     "#9900FF"))
 
 # Set random seed to BRB zipcode :-]
 set.seed(19104)
@@ -58,8 +76,6 @@ row_object <- function(taxa_id){
   }
   return(defaultlist)
 }
-
-
 
 
 Genus_code = function(tax_table_row){
@@ -102,6 +118,20 @@ Species_code = function(tax_table_row){
     return("NULL")
   }
 }
+
+
+# Returns P value of z test for differences in proportions 
+Calculate_Proptest = function(row_32, row_35){
+  successes32 = sum(row_32)
+  successes35 = sum(row_35)
+  
+  N32 = length(row_32)
+  N35 = length(row_35)
+  
+  testresult = prop.test(x=c(successes32, successes35), n=c(N32, N35))
+  return(testresult$p.value)
+}
+
 
 # Read in data & metadata 
 OTU_Table = read.csv2("/Users/amycampbell/Documents/IowaWoundData2021/Qiime2Data/RInput/table-with-taxonomy.tsv", header=T, sep="\t",skip=1)
@@ -191,8 +221,8 @@ uwUF = plot_ordination(PhyloseqObjectForUniFrac, unifracUnWeighted, color="Run")
 gridExtra::grid.arrange(wUF, uwUF, ncol=2)
 
 # Seems that beta divergence is significant between runs by unweighted, but not weighted, UniFrac
-UniFracWeightedPreContam = adonis(unifracdists ~sample_data(PhyloseqObjectForUniFrac)$Run)
-UniFracUnWeightedPreContam = adonis(Unweighted_unifracdists ~sample_data(PhyloseqObjectForUniFrac)$Run)
+UniFracWeightedPreContamAdonis = adonis(unifracdists ~sample_data(PhyloseqObjectForUniFrac)$Run, permutations=9999)
+UniFracUnWeightedPreContamAdonis = adonis(Unweighted_unifracdists ~sample_data(PhyloseqObjectForUniFrac)$Run, permutations=9999)
 
 # See if unifrac distances cluster by Run (after tax_glom)
 PhyloseqObjectForUniFrac_GenusGlom =  tax_glom(PhyloseqObjectForUniFrac, taxrank = "Genus")
@@ -206,14 +236,15 @@ uwUFGenus = plot_ordination(PhyloseqObjectForUniFrac_GenusGlom, unifracUnWeighte
 gridExtra::grid.arrange(wUFgenus, uwUFGenus, ncol=2)
 
 # Once again, diff seems greater in unweighted than weighted unifrac -- maybe due to the rare species picked up by the additional reads in 32? 
-UniFracWeightedPreContamGenus=adonis(unifracdistsGenus ~sample_data(PhyloseqObjectForUniFrac_GenusGlom)$Run)
-UniFracUnWeightedPreContamGenus=adonis(Unweighted_unifracdistsGenus ~sample_data(PhyloseqObjectForUniFrac_GenusGlom)$Run)
+UniFracWeightedPreContamGenusAdonis=adonis(unifracdistsGenus ~sample_data(PhyloseqObjectForUniFrac_GenusGlom)$Run, permutations=9999)
+UniFracUnWeightedPreContamGenusAdonis=adonis(Unweighted_unifracdistsGenus ~sample_data(PhyloseqObjectForUniFrac_GenusGlom)$Run, permutations=9999)
+
 
 PhyloseqObjectGenusGlom = tax_glom(PhyloseqObject, taxrank = "Genus")
-plot_richness(PhyloseqObject,x="Run", measures=c("Observed", "Shannon", "Simpson")) + ggtitle("Alpha Diversity (ASVs)") + geom_boxplot()
 
+RichnessPreContamASV  = plot_richness(PhyloseqObjectForUniFrac,x="Run", measures=c("Observed", "Shannon", "Simpson")) + ggtitle("Alpha Diversity (ASVs)") + geom_boxplot()
+RichnessPreContamGenus =plot_richness(PhyloseqObjectGenusGlom,x="Run", measures=c("Observed", "Shannon", "Simpson")) + ggtitle("Alpha Diversity (Genera)")+ geom_boxplot()
 
-plot_richness(PhyloseqObjectGenusGlom,x="Run", measures=c("Observed", "Shannon", "Simpson")) + ggtitle("Alpha Diversity (Genera)")+ geom_boxplot()
 
 ##################
 # Decontamination 
@@ -333,79 +364,115 @@ PhyloseqObject = subset_samples(PhyloseqObject, ControlStatus %in% c("NonControl
 # Filter to samples with at least 1200 assigned OTUs removes 22 samples 
 # This filter removes 1 Venous ulcer, 17 surgical wounds, 2 traumatic wounds, 2 mixed traumatic + surgical 
 PhyloseqObject = subset_samples(PhyloseqObject, TotalOTUs >= 1200)
-PhyloseqObjectStricter = subset_samples(PhyloseqObject, TotalOTUs >= 1500)
-PhyloseqObjectStrictest = subset_samples(PhyloseqObject, TotalOTUs >= 2000)
 
-# Unifrac distances after decontamination, filtering to samples with 1200 reads and above
-#########################################################################################
-Unweighted_unifracdistsPostDecontam =  phyloseq::distance(PhyloseqObject, method="unifrac")
-unifracUnWeightedFilteredPostDecontam= ordinate(PhyloseqObject,"PCoA", distance=Unweighted_unifracdistsPostDecontam)
-uwUFFilteredPlotDecontam =  plot_ordination(PhyloseqObject, unifracUnWeightedFilteredPostDecontam, color="Run") + scale_colour_manual(values=twocolor) + ggtitle("Principal Coordinates ( OTU-level unweighted UniFrac distance) in MiSeq Runs After Decontamination") + theme_classic()
+# # Unifrac distances after decontamination, filtering to samples with 1200 reads and above (ASV-level)
+# ######################################################################################################
+# Unweighted_unifracdistsPostDecontam =  phyloseq::distance(PhyloseqObject, method="unifrac")
+# unifracUnWeightedFilteredPostDecontam= ordinate(PhyloseqObject,"PCoA", distance=Unweighted_unifracdistsPostDecontam)
+# uwUFFilteredPlotDecontam =  plot_ordination(PhyloseqObject, unifracUnWeightedFilteredPostDecontam, color="Run") + scale_colour_manual(values=twocolor) + ggtitle("Principal Coordinates ( OTU-level unweighted UniFrac distance) in MiSeq Runs After Decontamination") + theme_classic()
+# 
+# unifracdistsFilteredOTUPostDecontam <- phyloseq::distance(PhyloseqObject, method="wunifrac")
+# unifracWeightedFilteredOTUPostDecontam = ordinate(PhyloseqObject,"PCoA", distance=unifracdistsFilteredOTUPostDecontam)
+# PlotunifracWeightedFilteredOTUPostDecontam = plot_ordination(PhyloseqObject, unifracWeightedFilteredOTUPostDecontam, color="Run") + scale_colour_manual(values=twocolor) + ggtitle("Principal Coordinates (OTU-level weighted UniFrac distance) in MiSeq Runs After Decontamination") + theme_classic()
+# 
+# # Unifrac distances after decontamination, filtering to samples with 1200 reads and above (Genus-level)
+# #######################################################################################################
+# PhyloseqObjectGenus = tax_glom(PhyloseqObject, taxrank = "Genus", bad_empty=c(NA, "NA"))
+# 
+# Unweighted_unifracdistsPostDecontamGenus =  phyloseq::distance(PhyloseqObjectGenus, method="unifrac")
+# unifracUnWeightedFilteredPostDecontamGenus= ordinate(PhyloseqObjectGenus,"PCoA", distance=Unweighted_unifracdistsPostDecontamGenus)
+# uwUFFilteredPlotDecontamGenus =  plot_ordination(PhyloseqObjectGenus, unifracUnWeightedFilteredPostDecontamGenus, color="Run") + scale_colour_manual(values=twocolor) + ggtitle("Principal Coordinates ( Genus-level unweighted UniFrac distance) in MiSeq Runs After Decontamination") + theme_classic()
+# 
+# unifracdistsFilteredOTUPostDecontamGenus <- phyloseq::distance(PhyloseqObjectGenus, method="wunifrac")
+# unifracWeightedFilteredOTUPostDecontamGenus = ordinate(PhyloseqObjectGenus,"PCoA", distance=unifracdistsFilteredOTUPostDecontamGenus)
+# PlotunifracWeightedFilteredPostDecontamGenus = plot_ordination(PhyloseqObjectGenus, unifracWeightedFilteredOTUPostDecontamGenus, color="Run") + scale_colour_manual(values=twocolor) + ggtitle("Principal Coordinates (Genus-level weighted UniFrac distance) in MiSeq Runs After Decontamination") + theme_classic()
+# 
+# # PERMANOVAS 
+# # OTU level
+# OTULevelDF = data.frame(PhyloseqObject@sam_data)
+# OTU_UnweightedAdonisPostDecontam = adonis(Unweighted_unifracdistsPostDecontam ~ Run, data=OTULevelDF, permutations=9999)
+# OTU_WeightedAdonisPostDecontam = adonis(unifracdistsFilteredOTUPostDecontam ~ Run, data=OTULevelDF, permutations=9999)
+# 
+# #Genus level
+# GenusLevelDF = data.frame(PhyloseqObjectGenus@sam_data)
+# GenusUnweightedAdonisPostDecontam = adonis(Unweighted_unifracdistsPostDecontamGenus ~ Run,data=GenusLevelDF, permutations=9999)
+# GenusWeightedAdonisPostDecontam = adonis(unifracdistsFilteredOTUPostDecontamGenus ~ Run, data=GenusLevelDF, permutations=9999)
+# 
+# 
+# # Adonis permanova p-values for plots
+# ######################
+# PvalueWeightedPreContamASV = toString(UniFracWeightedPreContamAdonis$aov.tab$`Pr(>F)`[1])
+# PvalueUnweightedPreContamASV = toString(UniFracUnWeightedPreContamAdonis$aov.tab$`Pr(>F)`[1])
+# PvalueWeightedPreContamGenus = toString(UniFracWeightedPreContamGenusAdonis$aov.tab$`Pr(>F)`[1])
+# PvalueUnweightedPreContamGenus = toString(UniFracUnWeightedPreContamGenusAdonis$aov.tab$`Pr(>F)`[1])
+# 
+# PvalueWeightedPostASV =  toString(OTU_WeightedAdonisPostDecontam$aov.tab$`Pr(>F)`[1])
+# PvalueUnweightedPostASV =  toString(OTU_UnweightedAdonisPostDecontam$aov.tab$`Pr(>F)`[1])
+# PvalueWeightedPostGenus = toString(GenusWeightedAdonisPostDecontam$aov.tab$`Pr(>F)`[1])
+# PvalueUnweightedPostGenus = toString(GenusUnweightedAdonisPostDecontam$aov.tab$`Pr(>F)`[1])
+# 
+# # Pre-decontam plots for saving
+# #############################
+# wUF = wUF + annotate(geom="text", x=-.09, y=.01, label=paste0("permanova_P=", PvalueWeightedPreContamASV))
+# uwUF = uwUF + annotate(geom="text", x=-.4, y=.2, label=paste0("permanova_P=", PvalueUnweightedPreContamASV))
+# wUFgenus = wUFgenus + annotate(geom="text", x=-.6, y=.2, label=paste0("permanova_P=", PvalueWeightedPreContamGenus))
+# uwUFGenus  = uwUFGenus + annotate(geom="text", x=-.22, y=.27, label=paste0("permanova_P=", PvalueUnweightedPreContamGenus))
+# 
+# # Post-decontam plots for saving
+# #############################
+# PlotunifracWeightedFilteredOTUPostDecontam = PlotunifracWeightedFilteredOTUPostDecontam + annotate(geom="text", x=-.08, y=.03, label=paste0("permanova_P=", PvalueWeightedPostASV))
+# uwUFFilteredPlotDecontam = uwUFFilteredPlotDecontam + annotate(geom="text", x=-.4, y=.25, label=paste0("permanova_P=", PvalueUnweightedPostASV))
+# PlotunifracWeightedFilteredPostDecontamGenus = PlotunifracWeightedFilteredPostDecontamGenus + annotate(geom="text", x=-.6, y=.22, label=paste0("permanova_P=", PvalueWeightedPostGenus))
+# uwUFFilteredPlotDecontamGenus = uwUFFilteredPlotDecontamGenus + annotate(geom="text", x=-.3, y=.25, label=paste0("permanova_P=", PvalueUnweightedPostGenus))
 
-unifracdistsFilteredOTUPostDecontam <- phyloseq::distance(PhyloseqObject, method="wunifrac")
-unifracWeightedFilteredOTUPostDecontam = ordinate(PhyloseqObject,"PCoA", distance=unifracdistsFilteredOTUPostDecontam)
-PlotunifracWeightedFilteredOTUPostDecontam = plot_ordination(PhyloseqObject, unifracWeightedFilteredOTUPostDecontam, color="Run") + scale_colour_manual(values=twocolor) + ggtitle("Principal Coordinates (OTU-level weighted UniFrac distance) in MiSeq Runs After Decontamination") + theme_classic()
+# Save plots
+##############
+arrangedPreContam = gridExtra::grid.arrange(wUF, uwUF, wUFgenus, uwUFGenus)
+ggsave(arrangedPreContam, file="/Users/amycampbell/Documents/IowaWoundData2021/PreDecontamUnifracDistances.pdf", height=10, width=18)
 
-gridExtra::grid.arrange(uwUFFilteredPlotDecontam,PlotunifracWeightedFilteredOTUPostDecontam )
-
-PhyloseqObjectGenus = tax_glom(PhyloseqObject, taxrank = "Genus", bad_empty=c(NA, "NA"))
-
-Unweighted_unifracdistsPostDecontamGenus =  phyloseq::distance(PhyloseqObjectGenus, method="unifrac")
-unifracUnWeightedFilteredPostDecontamGenus= ordinate(PhyloseqObjectGenus,"PCoA", distance=Unweighted_unifracdistsPostDecontamGenus)
-uwUFFilteredPlotDecontamGenus =  plot_ordination(PhyloseqObjectGenus, unifracUnWeightedFilteredPostDecontamGenus, color="Run") + scale_colour_manual(values=twocolor) + ggtitle("Principal Coordinates ( Genus-level unweighted UniFrac distance) in MiSeq Runs After Decontamination") + theme_classic()
-
-unifracdistsFilteredOTUPostDecontamGenus <- phyloseq::distance(PhyloseqObjectGenus, method="wunifrac")
-unifracWeightedFilteredOTUPostDecontamGenus = ordinate(PhyloseqObjectGenus,"PCoA", distance=unifracdistsFilteredOTUPostDecontamGenus)
-PlotunifracWeightedFilteredOTUPostDecontamGenus = plot_ordination(PhyloseqObjectGenus, unifracWeightedFilteredOTUPostDecontamGenus, color="Run") + scale_colour_manual(values=twocolor) + ggtitle("Principal Coordinates (Genus-level weighted UniFrac distance) in MiSeq Runs After Decontamination") + theme_classic()
+arrangedPostDecontam = gridExtra::grid.arrange(PlotunifracWeightedFilteredOTUPostDecontam, uwUFFilteredPlotDecontam, PlotunifracWeightedFilteredPostDecontamGenus, uwUFFilteredPlotDecontamGenus)
+ggsave(arrangedPostDecontam, file="/Users/amycampbell/Documents/IowaWoundData2021/PostDecontamUnifracDistances.pdf", height=10, width=18)
 
 
-gridExtra::grid.arrange(uwUFFilteredPlotDecontamGenus,PlotunifracWeightedFilteredOTUPostDecontamGenus )
 
+richnessPostDecontamGenus = plot_richness(PhyloseqObjectGenus,x="Run", measures=c("Observed", "Shannon", "Simpson")) + ggtitle("Alpha Diversity (Genera) Post-Decontamination" ) + geom_boxplot()
+richnessPostDecontamASV = plot_richness(PhyloseqObject,x="Run", measures=c("Observed", "Shannon", "Simpson")) + ggtitle("Alpha Diversity (ASVs) Post-Decontamination")+ geom_boxplot()
+gridExtra::grid.arrange(richnessPostDecontamASV, richnessPostDecontamGenus)
 
-# PERMANOVAS 
-# OTU level
-OTULevelDF = data.frame(PhyloseqObject@sam_data)
-adonis(Unweighted_unifracdistsPostDecontam ~ Run, data=OTULevelDF, permutations=9999)
-adonis(unifracdistsFilteredOTUPostDecontam ~ Run, data=OTULevelDF, permutations=9999)
+# Plot mock community
+#######################
+# Good time to grab the mock community and look at its genus-level composition
+MockComm = subset_samples(PhyloseqObject, ControlStatus=="Mock")
+MockCommGenus = tax_glom(MockComm, taxrank="Genus")
+MockCommGenusFilter = MockCommGenus
+MockCommGenusFilter= filter_taxa(MockCommGenus, function(x) mean(x) > 0, TRUE)
+GenusPlotMock = plot_bar(MockCommGenusFilter, x="SampleID", y="Abundance", fill="Genus") + scale_fill_manual(values=rev(ampalette)) + ggtitle("Mock Community Genera")
+ggsave(GenusPlotMock, file="/Users/amycampbell/Documents/IowaWoundData2021/MockCommunityGenera.png")
 
-#Genus level
-GenusLevelDF = data.frame(PhyloseqObjectGenus@sam_data)
-adonis(Unweighted_unifracdistsPostDecontamGenus ~ Run,data=GenusLevelDF, permutations=9999)
-adonis(unifracdistsFilteredOTUPostDecontamGenus ~ Run, data=GenusLevelDF, permutations=9999)
+# Add patient metadata
+######################################
 
-PhyloseqObject = PhyloseqObject
-
-##########################################
-# Make sure 
-##########################################
+# Sample data minus mock community
+# OTULevelDF is just data.frame(PhyloseqObject@sam_data) above
 OTULevelDF = OTULevelDF %>% filter(ControlStatus!="Mock")
 
+# Mappings from Sample to patient
 patient_mapping32_select = patient_mapping32 %>% select(X.SampleID, SubjectID)
 patient_mapping32_select$SampleID = patient_mapping32_select$X.SampleID
+
 patient_mapping35_select = patient_mapping35 %>% select(X.SampleID, SubjectID)
 patient_mapping35_select$SampleID = patient_mapping35_select$X.SampleID
 
 patient_mapping = rbind(patient_mapping32_select, patient_mapping35_select)
 OTULevelDF = OTULevelDF %>% left_join(patient_mapping, by="SampleID")
-OTULevelDF = OTULevelDF %>% left_join
-
 
 colnames(OTULevelDF) = c("SampleID", "ControlStatus", "Run", "TotalOTUs", "X.SampleID","study_id")
 
+# Grab just a few 
 PatientMetadata_WoundType = PatientMetadata %>% select(wound_type, woundloc, study_id)
 PatientMetadata_WoundType$study_id = factor(PatientMetadata_WoundType$study_id)
 OTULevelDF = OTULevelDF %>% left_join(PatientMetadata_WoundType, by="study_id")
-
-
-MockComm = subset_samples(PhyloseqObject, ControlStatus=="Mock")
-MockCommGenus = tax_glom(MockComm, taxrank="Genus", bad_empty=c(NA, "NA"))
-MockCommGenusFilter = MockCommGenus
-MockCommGenusFilter1 = filter_taxa(MockCommGenus, function(x) mean(x) > 0, TRUE)
-
-MockCommGenusFilter = filter_taxa(MockCommGenusFilter, function(x) mean(x) > 193, TRUE)
-
-plot_bar(MockCommGenusFilter, x="SampleID", y="Abundance", fill="Genus") + scale_fill_manual(values=rev(ampalette))
-plot_bar(MockCommGenusFilter1, x="SampleID", y="Abundance", fill="Genus") + scale_fill_manual(values=rev(ampalette))
+row.names(OTULevelDF) = OTULevelDF$SampleID
 
 # note about metadata:
 # Wound types
@@ -415,6 +482,8 @@ plot_bar(MockCommGenusFilter1, x="SampleID", y="Abundance", fill="Genus") + scal
 # 5 = traumatic 
 # 6 = Mixed (Traumatic + surgical)
 # 7 = Other
+
+# Map meaningful strings onto numerical codes for wound type and location 
 OTULevelDF = OTULevelDF %>% mutate(wound_type_string = case_when(wound_type==1 ~ "Pressure", 
                                                                  wound_type==2 ~"Venous",
                                                                  wound_type==4 ~"Surgical", 
@@ -431,16 +500,16 @@ OTULevelDF = OTULevelDF %>% mutate(woundloc_string = case_when(woundloc==1 ~ "Ex
                                                               )
                                    
 )
+OTULevelDF$wound_type_string = factor(OTULevelDF$wound_type_string)
 
-# 1 -- Extremity 
-# 2 -- Trunk
-# 3 -- Head/Neck (only 3 of these total)
-# 4 -- Inguinal 
-ggplot(OTULevelDF, aes(x=Run, fill=factor(wound_type_string))) + geom_bar() + scale_fill_manual(values=rev(randpalette32)) + theme_minimal()  + ggtitle("Wound Types ")
+OTULevelDF$woundloc_string = factor(OTULevelDF$woundloc_string)
 
-ggplot(OTULevelDF, aes(x=Run, fill=factor(woundloc_string))) + geom_bar() + scale_fill_manual(values=rev(randpalette32)) + theme_minimal() + ggtitle("Wound Locations")
+woundtypeDistRun = ggplot(OTULevelDF, aes(x=Run, fill=wound_type_string)) + geom_bar() + scale_fill_manual(values=rev(randpalette32)) + theme_minimal()  + ggtitle("Wound Types ")
 
 
+woundlocDistRun = ggplot(OTULevelDF, aes(x=Run, fill=woundloc_string)) + geom_bar() + scale_fill_manual(values=rev(randpalette32)) + theme_minimal() + ggtitle("Wound Locations")
+Distributions = gridExtra::grid.arrange(woundtypeDistRun, woundlocDistRun, ncol=2)
+ggsave(Distributions, file="/Users/amycampbell/Documents/IowaWoundData2021/WoundLocTypeByRun.png")
 PatientMetadata$study_id = factor(PatientMetadata$study_id)
 patient_mapping$study_id = patient_mapping$SubjectID
 patient_mapping = patient_mapping %>% left_join(PatientMetadata, by="study_id")
@@ -452,15 +521,13 @@ PhyloseqObject@sam_data = sample_data(sampledataphyloseqobj)
 sample_names(PhyloseqObject) = sampledataphyloseqobj$SampleID
 
 
-save(PhyloseqObject, file="PhyloSeqObjectPostDecontam.rda")
-
-
 # Average together OTU counts for 2 duplicated patients 
 ########################################################
 PhyloseqObject@sam_data$study_id = factor(PhyloseqObject@sam_data$study_id)
 
 PhyloseqObject@sam_data$study_id = sapply(PhyloseqObject@sam_data$study_id, function(x) toString(x))
 
+# Get just those patients' samples 
 PhyloseqObject_2728 = subset_samples(PhyloseqObject, study_id %in% c("27", "28"))
 PhyloseqObjectMerged = merge_samples(PhyloseqObject_2728, "study_id")
 
@@ -472,20 +539,21 @@ sample_names(PhyloseqObjectMerged) = PhyloseqObjectMerged@sam_data$SampleID
 PhyloseqObjectMerged@sam_data$SubjectID = factor(PhyloseqObjectMerged@sam_data$study_id)
 PhyloseqObjectMerged@sam_data$Run = "MiSeqV1V3_32"
 PhyloseqObjectMerged@sam_data$ControlStatus="NonControl" 
+PhyloseqObjectMerged@sam_data$othwtype="" 
 
+# everything except these two samples 
 PhyloseqObjectUpdated = subset_samples(PhyloseqObject, !(study_id %in% c("27", "28")))
+
+# now add them back in 
 PhyloseqObjectUpdated = merge_phyloseq(PhyloseqObjectUpdated, PhyloseqObjectMerged)
-View(PhyloseqObjectUpdated@sam_data)
 
 save(PhyloseqObjectUpdated, file="PhyloSeqObjectPostDecontamMerged.rda")
 
+# Phylum level abundance 
+########################
 PhyloseqObjectUpdated =  subset_taxa(PhyloseqObjectUpdated, Phylum!="NA")
-PhyloseqObjectUpdatedRelabundance = PhyloseqObjectUpdated %>% transform_sample_counts(function(x) {x/sum(x)})
-barplot_all = plot_bar(PhyloseqObjectUpdatedRelabundance, x="Sample", y="Abundance", fill="Phylum") + scale_fill_manual(values=randpalette32)
 
-
-
-df_phyla = PhyloseqObjectUpdated %>% 
+df_phyla_prenorm = PhyloseqObjectUpdated %>% 
   tax_glom(taxrank = "Phylum") %>%
   transform_sample_counts(function(x) {x/sum(x)}) %>%
   psmelt() %>% 
@@ -493,10 +561,7 @@ df_phyla = PhyloseqObjectUpdated %>%
   group_by(Phylum)
 
 
-
-
-
-dataframe_counts = data.frame(df_phyla)
+dataframe_counts = data.frame(df_phyla_prenorm)
 sampnames = (unique(dataframe_counts$Sample))
 
 dataframe_counts = dataframe_counts %>% filter(Phylum=="Firmicutes")
@@ -514,23 +579,257 @@ samples35 = append(zero_35, dataframe_counts_35$Sample)
 Desired_order= append(samples32, samples35)
 View(df_phyla)
 
-plotPhyla = ggplot(df_phyla, aes(x=SampleID, y=Abundance, fill=Phylum)) + geom_bar(stat="identity") + ggtitle("Phylum-level composition by run, sorted by Firmicutes Abundance") + scale_fill_manual(values=randpalette32) + theme_minimal() + theme(axis.text.x=element_text(angle=90))
+plotPhylaPreNorm= ggplot(df_phyla_prenorm, aes(x=SampleID, y=Abundance, fill=Phylum)) + geom_bar(stat="identity") + ggtitle("Phylum-level composition by run (Pre-Normalization)") + scale_fill_manual(values=(randpalette18))+ theme_minimal() + theme(axis.text.x=element_text(angle=90))
 
-plotPhyla$data$SampleID = factor(plotPhyla$data$Sample, levels =Desired_order)
+plotPhylaPreNorm$data$SampleID = factor(plotPhylaPreNorm$data$Sample, levels =Desired_order)
+
+plotPhylaPreNorm + theme(axis.text.x = element_blank())
+
+# 
+# # NA strings:
+# NAstrings = c("unidentified_marine",
+# "uncultured_soil",
+# "unidentified_eubacterium",
+# "uncultured_organism", NA,
+# "NA", "uncultured_microorganism",
+# "uncultured_bacterium", "uncultured_candidate", "uncultured_compost",
+# "unidentified", "uncultured_prokaryote", "uncultured_rumen", "wastewater_metagenome")
+
+# taxes = data.frame(PhyloseqObjectUpdated@tax_table@.Data)
+# sort(unique(taxes$Species))
+# Specieslevel = tax_glom(PhyloseqObjectUpdated, taxrank= "Species", bad_empty = NAstrings)
+# taxesspecies = data.frame(Specieslevel@tax_table@.Data)
+# write.csv(taxesspecies, file="SpeciesLevelTaxTable.csv")
+# 
+
+# ###############################################
+# # Testing out effects of variance stabilization 
+# ###############################################
+# 
+# # for purposes of VST the factor doesn't do much  (confirmed this empirically by )
+# deseqobj_fromphylo = phyloseq_to_deseq2(PhyloseqObjectUpdated, ~Run)
+# 
+# # Calculate geometric means without running into divide by zero errors
+# # Via Phyloseq vignette (https://rdrr.io/bioc/phyloseq/src/inst/doc/phyloseq-mixture-models.R)
+# get_geometric_means <- function(x){
+#   mean = exp(sum(log(x[x>0]), na.rm=TRUE) / length(x))
+#   return(mean)
+# }
+# gmeans = apply(counts(deseqobj_fromphylo), 1, get_geometric_means)
+# estimates_sizes = estimateSizeFactors(deseqobj_fromphylo, geoMeans = gmeans)
+# disp_estimates = estimateDispersions(estimates_sizes)
+# 
+# v_stabilized_counts= getVarianceStabilizedData(disp_estimates)
+# v_stabilized_countsForZeroing = v_stabilized_counts
+# v_stabilized_countsForZeroing[which(v_stabilized_countsForZeroing < 0)] <- 0
+# 
+# PhyloseqObjectUpdatedNormalized = PhyloseqObjectUpdated
+# PhyloseqObjectUpdatedNormalized@otu_table = otu_table(v_stabilized_countsForZeroing, taxa_are_rows = T)
+# df_phyla_postnorm = PhyloseqObjectUpdatedNormalized %>% 
+#   tax_glom(taxrank = "Phylum") %>%
+#   transform_sample_counts(function(x) {x/sum(x)}) %>%
+#   psmelt() %>% 
+#   filter(Abundance >.01) %>%
+#   group_by(Phylum)
+# 
+# plotPhylaPostNorm= ggplot(df_phyla_postnorm, aes(x=SampleID, y=Abundance, fill=Phylum)) + geom_bar(stat="identity") + ggtitle("Phylum-level composition by run (Post-Normalization)") + scale_fill_manual(values=(randpalette23))+ theme_minimal() + theme(axis.text.x=element_text(angle=90))
+# 
+# plotPhylaPostNorm$data$SampleID = factor(plotPhylaPostNorm$data$Sample, levels =Desired_order)
+# 
+# extractlegend=cowplot::get_legend(plotPhylaPostNorm)
+# plotPhylaPostNorm + theme(axis.text.x = element_blank())
+# 
+# Pre_Post = gridExtra::grid.arrange(plotPhylaPreNorm +theme(axis.text.x = element_blank(), legend.position = "none") ,extractlegend, plotPhylaPostNorm + theme(axis.text.x = element_blank(), legend.position = "none"), nrow=2, widths=c(.8,.1))
+# ggsave(Pre_Post, file="/Users/amycampbell/Documents/IowaWoundData2021/PrePostNorm.pdf", height=12, width=25)
+
+#################################################
+# Testing batch effect correction
+#################################################
+
+SpeciesLevelGlom = PhyloseqObjectUpdated %>% tax_glom(taxrank="Species")# %>% transform_sample_counts(function(x) {x/sum(x)})
+GenusLevelGlom = PhyloseqObjectUpdated %>% tax_glom(taxrank="Genus") #
+# 2a41defcfcab7155dcb50a0c646ab68b
+SpeciesLevelGlomPct = SpeciesLevelGlom %>% transform_sample_counts(function(x) {x/sum(x)})
+GenusLevelGlomPct = GenusLevelGlom %>% transform_sample_counts(function(x) {x/sum(x)})
+
+# Genus-level batch correction 
+GenusLevelBatchCorrect = data.frame(GenusLevelGlomPct@otu_table@.Data)
+
+# Genera with <.1% abundance are considered missing
+GenusLevelBatchCorrect[GenusLevelBatchCorrect < .001] <- 0
+# Genera with >.1% abundance are considered present 
+GenusLevelBatchCorrect[GenusLevelBatchCorrect >= .001] <- 1
+
+#Divide into the two runs 
+GenusLevelDF32 = GenusLevelBatchCorrect %>% select(!contains("IowaWound.Human."))
+GenusLevelDF35 = GenusLevelBatchCorrect %>% select(contains("IowaWound.Human."))
+
+dataframe_for_recordingGenus= data.frame(otuID = row.names(GenusLevelDF32))
+PvectorGenus= sapply(1:nrow(dataframe_for_recordingGenus), function(x) Calculate_Proptest(GenusLevelDF32[x,], GenusLevelDF35[x, ]))
+dataframe_for_recordingGenus$Pvector = PvectorGenus
+dataframe_for_recordingGenus$adjPvector = PvectorGenus*nrow(dataframe_for_recordingGenus)
+
+rm_Genera = (dataframe_for_recordingGenus %>% filter(adjPvector< .05))$otuID
+
+taxagenusGlom = data.frame(GenusLevelGlom@tax_table@.Data)
+taxagenusGlom$otuID = row.names(taxagenusGlom)
+
+# Sneathia, Mycoplasma, Neisseria, and Allorhizobium-Neorhizobium-Pararhizobium-Rhizobium to be removed
+taxagenusGlom %>% filter(otuID %in% rm_Genera)
+
+KeepTaxaTestGenusBatch = setdiff(row.names(GenusLevelGlom@tax_table@.Data), rm_Genera)
+TestUnifracPostBatchEffectGenus = prune_taxa(KeepTaxaTestGenusBatch, GenusLevelGlom)
+
+# Since 120560 only had Mycoplasma after decontam, it's now an empty sample and has to be removed 
+TestUnifracPostBatchEffectGenus@sam_data$TotalOTUsLeftBatch = colSums(TestUnifracPostBatchEffectGenus@otu_table@.Data)
+TestUnifracPostBatchEffectGenus = subset_samples(TestUnifracPostBatchEffectGenus, TotalOTUsLeftBatch>1200)
+
+UW_testUnifrac_PostBatchGenus =  phyloseq::distance(TestUnifracPostBatchEffectGenus, method="unifrac")
+W_testUnifrac_PostBatchGenus =   phyloseq::distance(TestUnifracPostBatchEffectGenus, method="wunifrac")
+
+UW_ordination_PostbatchGenus = ordinate(TestUnifracPostBatchEffectGenus,"PCoA", distance=UW_testUnifrac_PostBatchGenus)
+W_ordination_PostbatchGenus = ordinate(TestUnifracPostBatchEffectGenus,"PCoA", distance=W_testUnifrac_PostBatchGenus)
+
+plot_UW_postbatchGenus = plot_ordination(TestUnifracPostBatchEffectGenus, UW_ordination_PostbatchGenus, color="Run") + scale_colour_manual(values=twocolor) + ggtitle("Principal Coordinates ( Genus-level unweighted UniFrac distance) in MiSeq Runs After Batch Correction") + theme_classic()
+plot_W_postbatchGenus = plot_ordination(TestUnifracPostBatchEffectGenus, W_ordination_PostbatchGenus, color="Run") + scale_colour_manual(values=twocolor) + ggtitle("Principal Coordinates ( Genus-level weighted UniFrac distance) in MiSeq Runs After Batch Correction") + theme_classic()
+
+PostBatchDFGenusTest = data.frame(TestUnifracPostBatchEffectGenus@sam_data)
+
+PostBatch_UnweightedAdonisGenusTest = adonis(UW_testUnifrac_PostBatchGenus ~ Run, data=PostBatchDFGenusTest, permutations=9999)
+PostBatch_WeightedAdonisGenusTest = adonis(W_testUnifrac_PostBatchGenus ~ Run, data=PostBatchDFGenusTest, permutations=9999)
 
 
-# NA strings:
-NAstrings = c("unidentified_marine",
-"uncultured_soil",
-"unidentified_eubacterium",
-"uncultured_organism", NA,
-"NA", "uncultured_microorganism",
-"uncultured_bacterium", "uncultured_candidate", "uncultured_compost",
-"unidentified", "uncultured_prokaryote", "uncultured_rumen", "wastewater_metagenome")
 
-taxes = data.frame(PhyloseqObjectUpdated@tax_table@.Data)
-sort(unique(taxes$Species))
-Specieslevel = tax_glom(PhyloseqObjectUpdated, taxrank= "Species", bad_empty = NAstrings)
-taxesspecies = data.frame(Specieslevel@tax_table@.Data)
-write.csv(taxesspecies, file="SpeciesLevelTaxTable.csv")
+
+
+
+
+
+
+
+
+# Test DMM on this
+TestUnifracPostBatchEffectGenus
+Counts = TestUnifracPostBatchEffectGenus@otu_table
+
+
+# Filter to species prevalent in at least 10 samples 
+PrevalenceInfo = data.frame(Counts)
+PrevalenceInfo$Prevalence = rowSums(PrevalenceInfo != 0)
+
+sort(PrevalenceInfo$Prevalence)
+
+PrevalenceInfoFilter = PrevalenceInfo %>% filter(Prevalence >= 10)
+TaxaKeepDMM = row.names(PrevalenceInfoFilter)
+
+#
+PhyloDMM = prune_taxa(TaxaKeepDMM, TestUnifracPostBatchEffectGenus)
+
+CountsDMM = t(PhyloDMM@otu_table@.Data)
+
+CountsDMMinput = data.matrix(CountsDMM)
+
+densityplot(log10(colSums(CountsDMMinput)), xlim=range(log10(colSums(CountsDMMinput))),xlab="Taxon representation (log 10 count)")
+densityplot((colSums(CountsDMMinput)), xlim=range((colSums(CountsDMMinput))),xlab="Taxon representation (raw count)")
+library(DirichletMultinomial)
+
+
+# Fit dirichlet multinomial mixture models with 1,2,...,20 components and plot laplace approximation 
+FitDirichlets = mclapply(1:12, dmn, count=CountsDMMinput, verbose=TRUE, seed=19104)
+lplc <- sapply(FitDirichlets, laplace)
+plot(lplc, type = 'b', xlab = 'Dirichlet Components',ylab='Model Fit', main="Dirichlet Components by Laplace Model Fit (Genus Read Counts)") 
+
+# get dirichlet fit object with maximum laplace-estimated likelihood (minimum negative)
+bestFit <- FitDirichlets[[which.min(lplc)]]
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+OTULevelGlom = PhyloseqObjectUpdated %>% transform_sample_counts(function(x) {x/sum(x)})
+
+OTULevelBatchCorrect = data.frame(OTULevelGlom@otu_table@.Data)
+OTULevelBatchCorrect[OTULevelBatchCorrect < .0001] <- 0
+OTULevelBatchCorrect[OTULevelBatchCorrect >= .0001] <- 1
+
+OTULevelDF32 = OTULevelBatchCorrect %>% select(!contains("IowaWound.Human."))
+OTULevelDF35 = OTULevelBatchCorrect %>% select(contains("IowaWound.Human."))
+
+dataframe_for_recordingOTUs = data.frame(otuID = row.names(OTULevelDF32))
+PvectorOTU = sapply(1:nrow(dataframe_for_recordingOTUs), function(x) Calculate_Proptest(OTULevelDF32[x,], OTULevelDF35[x, ]))
+dataframe_for_recordingOTUs$Pvector = PvectorOTU
+dataframe_for_recordingOTUs$PvectorAdj = dataframe_for_recordingOTUs$Pvector * nrow(dataframe_for_recordingOTUs)
+rm_OTUs = (dataframe_for_recordingOTUs %>% filter(PvectorAdj< .01))$otuID
+OTULevelGlom@tax_table@.Data[rm_OTUs,]
+
+
+KeepTaxaTestOTUBatch = setdiff(row.names(PhyloseqObjectUpdated@otu_table@.Data), rm_OTUs)
+PhyloseqObjectUpdatedTestRemove = prune_taxa(KeepTaxaTestOTUBatch, PhyloseqObjectUpdated)
+
+
+# Test Unifrac with Batch Effect Correction (OTU level )
+TestUnifracPostBatchEffect = PhyloseqObjectUpdatedTestRemove
+UW_testUnifrac_PostBatch =  phyloseq::distance(TestUnifracPostBatchEffect, method="unifrac")
+W_testUnifrac_PostBatch <- phyloseq::distance(TestUnifracPostBatchEffect, method="wunifrac")
+
+
+UW_ordination_Postbatch = ordinate(TestUnifracPostBatchEffect,"PCoA", distance=UW_testUnifrac_PostBatch)
+W_ordination_Postbatch = ordinate(TestUnifracPostBatchEffect,"PCoA", distance=W_testUnifrac_PostBatch)
+
+plot_UW_postbatch = plot_ordination(TestUnifracPostBatchEffect, UW_ordination_Postbatch, color="Run") + scale_colour_manual(values=twocolor) + ggtitle("Principal Coordinates ( OTU-level unweighted UniFrac distance) in MiSeq Runs After Batch Correction") + theme_classic()
+plot_W_postbatch = plot_ordination(TestUnifracPostBatchEffect, W_ordination_Postbatch, color="Run") + scale_colour_manual(values=twocolor) + ggtitle("Principal Coordinates ( OTU-level weighted UniFrac distance) in MiSeq Runs After Batch Correction") + theme_classic()
+
+
+p_val_UW = PostBatch_UnweightedAdonis$aov.tab$`Pr(>F)`
+p_val_W = PostBatch_WeightedAdonis$aov.tab$`Pr(>F)`
+
+plot_UW_postbatch = plot_UW_postbatch + annotate("text", x=-.1, y=.2, label=paste0("PermanovaP=", toString(p_val_UW[1])))
+plot_W_postbatch = plot_W_postbatch + annotate("text", x=-.06, y=.04, label=paste0("PermanovaP=", toString(p_val_W[1])))
+
+PostBatchDF = data.frame(TestUnifracPostBatchEffect@sam_data)
+
+PostBatch_UnweightedAdonis = adonis(UW_testUnifrac_PostBatch ~ Run, data=PostBatchDF, permutations=9999)
+PostBatch_WeightedAdonis = adonis(W_testUnifrac_PostBatch ~ Run, data=PostBatchDF, permutations=9999)
+
+# Test Unifrac with OTU-level Batch effect (Genus level Phylo)
+
+GenusPostBatchEffect = PhyloseqObjectUpdatedTestRemove %>% tax_glom(taxrank = "Genus")
+UW_testUnifrac_PostBatchGenus =  phyloseq::distance(GenusPostBatchEffect, method="unifrac")
+W_testUnifrac_PostBatchGenus <- phyloseq::distance(GenusPostBatchEffect, method="wunifrac")
+
+
+UW_ordination_PostbatchGenus = ordinate(GenusPostBatchEffect,"PCoA", distance=UW_testUnifrac_PostBatchGenus)
+W_ordination_PostbatchGenus = ordinate(GenusPostBatchEffect,"PCoA", distance=W_testUnifrac_PostBatchGenus)
+
+plot_UW_postbatchGenus = plot_ordination(GenusPostBatchEffect, UW_ordination_PostbatchGenus, color="Run") + scale_colour_manual(values=twocolor) + ggtitle("Principal Coordinates ( Genus-level unweighted UniFrac distance) in MiSeq Runs After Batch Correction") + theme_classic()
+plot_W_postbatchGenus = plot_ordination(GenusPostBatchEffect, W_ordination_PostbatchGenus, color="Run") + scale_colour_manual(values=twocolor) + ggtitle("Principal Coordinates ( Genus-level weighted UniFrac distance) in MiSeq Runs After Batch Correction") + theme_classic()
+
+PostBatchDFGenus = data.frame(GenusPostBatchEffect@sam_data)
+
+PostBatch_UnweightedAdonisGenus = adonis(UW_testUnifrac_PostBatchGenus ~ Run, data=PostBatchDFGenus, permutations=9999)
+PostBatch_WeightedAdonisGenus = adonis(W_testUnifrac_PostBatchGenus ~ Run, data=PostBatchDFGenus, permutations=9999)
+PostBatch_UnweightedAdonisGenus
+PostBatch_WeightedAdonisGenus
+
+
+p_val_UW = PostBatch_UnweightedAdonis$aov.tab$`Pr(>F)`
+p_val_W = PostBatch_WeightedAdonis$aov.tab$`Pr(>F)`
+
+plot_UW_postbatch = plot_UW_postbatch + annotate("text", x=-.1, y=.2, label=paste0("PermanovaP=", toString(p_val_UW[1])))
+plot_W_postbatch = plot_W_postbatch + annotate("text", x=-.06, y=.04, label=paste0("PermanovaP=", toString(p_val_W[1])))
+
+
+
+
 
