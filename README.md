@@ -41,44 +41,31 @@ Iowa Wound Pain analyses 2021-22
 
 - [fastqc.sh](https://github.com/Grice-Lab/IowaWound/blob/master/scripts/fastqc.sh)
 
-# (3) FastQC to get quality metrics 
+# (4) Selection and empirical tests of truncation lengths for denoising step 
 
-## Input
-- Raw demultiplexed data path from Qi’s pipeline in IowaWoundData/MiSeqV1V3_35/demultiplexed, IowaWoundData/MiSeqV1V3_32/demultiplexed
+The basic principle of truncation length selection was to select a length that met a high enough median PHRED quality cutoff without cutting reads so short that pairs would fail to overlap and would be filtered out in the denoising step of Qiime2. As described in my 2021-11-2 notebook entry, I used [ChooseDadaTruncations.R](https://github.com/Grice-Lab/IowaWound/blob/master/scripts/ChooseDadaTruncations.R) to identify the read lengths such that each read would meet a Phred quality cutoff of  20, 23, and 25. I then tested the parameters associated with each of these cutoff scores for each run using [TestDenoise.sh](https://github.com/Grice-Lab/IowaWound/blob/master/scripts/TestDenoise.sh) , and plotted the filtered nonchimeric read yield for each set of parameters using [FilteringDenoisingStats.R](https://github.com/Grice-Lab/IowaWound/blob/master/scripts/FilteringDenoisingStats.R).
 
-## Outputs
-- Full MultiQC output to IowaWoundData/MultiQC_PostDemuxed
-
-## Scripts
-
-- [fastqc.sh](https://github.com/Grice-Lab/IowaWound/blob/master/scripts/fastqc.sh)
-
-# (4) Selection of truncation lengths and denoising with DADA
 
 ## Input
 - IowaWoundData/MultiQC_PostDemuxed/mqc_fastqc_per_base_sequence_quality_plot_1.txt 
 - IowaWoundData/MiSeqV1V3_35/paired-end-demux35.qza
 - IowaWoundData/MiSeqV1V3_32/paired-end-demux32.qza
-- denoising.sh parameters for MiSeqV1V3_32 chosen in [ChooseDadaTruncations.R](https://github.com/Grice-Lab/IowaWound/blob/master/scripts/ChooseDadaTruncations.R):
-- - –p-trunc-len-f 272
-- - -p-trunc-len-r 257
-- denoising.sh parameters for MiSeqV1V3_35 chosen in [ChooseDadaTruncations.R](https://github.com/Grice-Lab/IowaWound/blob/master/scripts/ChooseDadaTruncations.R):
-- - –p-trunc-len-f 262
-- - –p-trunc-len-r 232 
-
-## Outputs
-- IowaWoundData/MiSeqV1V3_32/rep-seqs32.qza
-- IowaWoundData/MiSeqV1V3_32/table32.qza
-- IowaWoundData/MiSeqV1V3_32/denoising-stats32.qza
-- IowaWoundData/MiSeqV1V3_35/rep-seqs35.qza
-- IowaWoundData/MiSeqV1V3_35/table35.qza
-- IowaWoundData/MiSeqV1V3_35/denoising-stats35.qza
+- Range of truncation length parameters for MiSeqV1V3_32 chosen in [ChooseDadaTruncations.R](https://github.com/Grice-Lab/IowaWound/blob/master/scripts/ChooseDadaTruncations.R)
+- Range of truncation length parameters parameters for MiSeqV1V3_35 chosen in [ChooseDadaTruncations.R](https://github.com/Grice-Lab/IowaWound/blob/master/scripts/ChooseDadaTruncations.R):
 
 ## Scripts
 - [ChooseDadaTruncations.R](https://github.com/Grice-Lab/IowaWound/blob/master/scripts/ChooseDadaTruncations.R)
-- [denoise.sh](https://github.com/Grice-Lab/IowaWound/blob/master/scripts/denoise.sh)
+- [TestDenoise.sh](https://github.com/Grice-Lab/IowaWound/blob/master/scripts/TestDenoise.sh)
+- [FilteringDenoisingStats.R](https://github.com/Grice-Lab/IowaWound/blob/master/scripts/FilteringDenoisingStats.R)
 
-# (5) Visualizations of denoising output 
+## Results
+To maximize the filtered nonchimeric paired reads yielded from the denoising step, and in particular that of MiSeqV1V3_35 (which had much lower read depth than MiSeqV1V3_32), I selected 282 and 247 as truncation lengths for the forward and reverse reads, respectively. 
+
+# (5) Denoising 
+
+
+
+# (6) Visualizations of denoising output  
 ## Input
 - IowaWoundData/MiSeqV1V3_32/rep-seqs32.qza
 - IowaWoundData/MiSeqV1V3_32/table32.qza
@@ -98,7 +85,7 @@ Iowa Wound Pain analyses 2021-22
 [summarize_denoise.sh](https://github.com/Grice-Lab/IowaWound/blob/master/scripts/summarize_denoise.sh)
 
 
-# (6) Make phylogeny 
+# (7) Make phylogeny 
 ## Input
 - IowaWoundData/MiSeqV1V3_32/rep-seqs32.qza 
 - IowaWoundData/MiSeqV1V3_35/rep-seqs35.qza 
