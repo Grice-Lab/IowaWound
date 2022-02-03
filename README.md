@@ -115,19 +115,27 @@ To maximize the filtered nonchimeric paired reads yielded from the denoising ste
 
 # (8) Make phylogeny 
 ## Input
-- IowaWoundData/MiSeqV1V3_32/rep-seqs32.qza 
-- IowaWoundData/MiSeqV1V3_35/rep-seqs35.qza 
+- IowaWoundData/Qiime2Data/rep-seqs-merged.qza
+- IowaWoundData/Qiime2Data/mergedtable.qza
 
 ## Outputs
--  IowaWoundData/MiSeqV1V3_32/aligned-rep-seqs32.qza
--  IowaWoundData/MiSeqV1V3_35/aligned-rep-seqs35.qza
--  IowaWoundData/MiSeqV1V3_32/masked-aligned-rep-seqs32.qza
--  IowaWoundData/MiSeqV1V3_35/masked-aligned-rep-seqs35.qza
--  IowaWoundData/MiSeqV1V3_32/unrooted-tree32.qza
--  IowaWoundData/MiSeqV1V3_35/unrooted-tree35.qza
--  IowaWoundData/MiSeqV1V3_32/rooted-tree32.qza
--  IowaWoundData/MiSeqV1V3_32/rooted-tree35.qza
+- masked-aligned-rep-seqs-merged.qza (alignment)
+- unrooted-tree-merged.qza (unrooted tree)
+- rooted-tree-merged.qza (rooted tree)
+
 ## Scripts
 
 - [make_phylogeny.sh](https://github.com/Grice-Lab/IowaWound/blob/master/scripts/make_phylogeny.sh)
+
+
+# (9) Export data from Qiime2 to R-readable data
+export_data.sh
+https://github.com/Grice-Lab/IowaWound/blob/master/scripts/export_data.sh
+
+## Outputs
+Qiime2Data/RInput/taxonomy.tsv (full taxonomy table with Kingdom-->species)
+Qiime2Data/RInput/table-with-taxonomy.biom (.biom format OTU/ASV table with Taxa IDs)
+Qiime2Data/RInput/table-with-taxonomy.tsv (OTU/ASV table with taxa IDs in .tsv format, easy for sweet R script to read)
+Qiime2Data/RInput/tree.nwk (unrooted tree in .newick form for input into Phyloseq, unifrac distances)
+
     
