@@ -2,7 +2,8 @@
 # Jan 2022
 # Analysis using decontaminated data object output by Qiime2OutputNov.R 
 
-
+# Amy Campbell
+# Iowa Wound microbiome analysis 2022
 library("phyloseq")
 library("dplyr")
 library("stringr")
@@ -12,7 +13,7 @@ library("vegan")
 library("ggpubr")
 library("lattice")
 library("DirichletMultinomial")
-
+library("reshape2")
 # Set Random seed
 ##################
 set.seed(19104)
@@ -40,6 +41,9 @@ randocolor18 = c("#7570B3", "#E7298A", "#66C2A5", "#FB8072", "#BC80BD",
                  "#A6D854", "#E31A1C", "#FDCDAC", "#A6761D", "#80B1D3",
                  "#FF9933", "#F4CAE4", "#FFFF66", "#CCEBC5", "#1F78B4",
                  "#BEBADA", "#B3B3B3", "#FF6600")
+#pie(rep(1,18), col=rando18_1)
+
+
 rando18_1 = c("#BEAED4","#386CB0",
               "#FF7F00", "#33A02C",
               "#A6CEE3", "#A65628",
@@ -52,12 +56,77 @@ rando18_1 = c("#BEAED4","#386CB0",
 
 Paincolors=c("#FFFFCC", "#FFB266", "#CC6600", "#990000", "#E0E0E0")
 
+color21 =c("#7570B3", "#E7298A", "#66C2A5","#E31A1C",
+           "#BC80BD", "#A6D854", "#FDCDAC", "#A6761D", "#80B1D3",
+           "#FF9933", "#F4CAE4", "#FFFF66", "#2E8B57", "#CCEBC5", 
+           "#1F78B4", "#BEBADA","#B3B3B3","#FF6600", "#800000","#23297A", "#FB8072")
+timepalette = c("#90E0EF","#0077B6", "#ECB02B","#E75E02","#840404" )
+
+
+
 # blue and yellow
 twocolor = c("#FFC20A", "#0C7BDC")
 
-load("/Users/amycampbell/Documents/IowaWoundData2021/GenusLevelBatchCorrected.rda")
+############
+# Functions
+############
+Genus_code = function(tax_table_row){
+  if(tax_table_row["Genus"] !="NA"){
+    return(tax_table_row["Genus"])
+  }else if(tax_table_row["Family"] != "NA"){
+    return(paste(tax_table_row["Family"] , tax_table_row["Genus"], sep="_"))
+  }else if(tax_table_row["Order"] != "NA"){
+    return(paste(tax_table_row["Order"], paste(tax_table_row["Family"] , tax_table_row["Genus"], sep="_"), sep="_"))
+  }else if(tax_table_row["Class"]!="NA"){
+    return(paste(tax_table_row["Class"],paste(tax_table_row["Order"], paste(tax_table_row["Family"] , tax_table_row["Genus"], sep="_"), sep="_"), sep="_"))
+  }else if(tax_table_row["Phylum"] !="NA"){
+    return(paste(tax_table_row["Phylum"], paste(tax_table_row["Class"],paste(tax_table_row["Order"], paste(tax_table_row["Family"] , tax_table_row["Genus"], sep="_"), sep="_"), sep="_"), sep="_"))
+  }else if(tax_table_row["Phylum"]=="NA"){
+    print("ouch")
+    return("NULL")
+  }else{
+    return("NULL")
+  }
+}
 
-# BatchCorrectedPhyloseq
+# Load data
+############
+# (1) Phyloseq object with metadata, genus-level agglomerated & batch corrected 
+load("/Users/amycampbell/Documents/IowaWoundData2021/GenusLevelBatchCorrected.rda")
+AnaerobeMappings = read.csv("/Users/amycampbell/Documents/IowaWoundData2021/AnaerobeDB.csv")
+
+BatchCorrectedPhyloseq = phyloseq::subset_taxa(BatchCorrectedPhyloseq, Order!="Chloroplast")
+BatchCorrectedPhyloseq = phyloseq::subset_taxa(BatchCorrectedPhyloseq, Family!="Mitochondria")
+BatchCorrectedPhyloseq = phyloseq::subset_samples(BatchCorrectedPhyloseq, study_id !="Mock")
+BatchCorrectedPhyloseq@sam_data$TotalOTUsLeftBatchMitoChloro = colSums(BatchCorrectedPhyloseq@otu_table@.Data)
+
+BatchCorrectedPhyloseq = phyloseq::subset_samples(BatchCorrectedPhyloseq, TotalOTUsLeftBatchMitoChloro>1200)
+
+# Plot of remaining 406 patients + their wound type, location
+#############################################################
+FinalSampleDist = data.frame(BatchCorrectedPhyloseq@sam_data)
+FinalSampleDist = FinalSampleDist %>% mutate(wound_type_string = case_when(wound_type==1 ~ "Pressure", 
+                                                                                   wound_type==2 ~"Venous",
+                                                                                   wound_type==4 ~"Surgical", 
+                                                                                   wound_type==5 ~ "Traumatic", 
+                                                                                   wound_type==6 ~ "Mixed Traumatic/Surgical",
+                                                                                   wound_type==7 ~ "Other")
+                                                     
+)
+
+FinalSampleDist = FinalSampleDist %>% mutate(woundloc_string = case_when(woundloc==1 ~ "Extremity", 
+                                                                                 woundloc==2 ~"Trunk",
+                                                                                 woundloc==3 ~"Head/Neck", 
+                                                                                 woundloc==4 ~ "Inguinal"
+)
+
+)
+
+
+WoundLocRun = ggplot(FinalSampleDist, aes(x=factor(Run), fill=factor(woundloc_string))) +
+  geom_bar() + scale_fill_manual(values=rev(randpalette32)) + theme_minimal()  + ggtitle("Wound location by Run") +xlab("MiSeq Run") 
+WoundTypeRun = ggplot(FinalSampleDist, aes(x=factor(Run), fill=factor(wound_type_string))) +
+  geom_bar() + scale_fill_manual(values=rev(randpalette32)) + theme_minimal()  + ggtitle("Wound type by Run") +xlab("MiSeq Run") 
 
 WeightedUnifracDists =  phyloseq::distance(BatchCorrectedPhyloseq, method="wunifrac")
 OrdinationWeightedUnifrac = ordinate(BatchCorrectedPhyloseq,"PCoA", distance=WeightedUnifracDists)
@@ -65,17 +134,10 @@ BatchCorrectedPhyloseq@sam_data$woundcarepain = factor(BatchCorrectedPhyloseq@sa
 BatchCorrectedPhyloseq@sam_data$wound_type = factor(BatchCorrectedPhyloseq@sam_data$wound_type)
 BatchCorrectedPhyloseq@sam_data$woundloc = factor(BatchCorrectedPhyloseq@sam_data$woundloc)
 
-
-PlotWeightedUnifracPain = plot_ordination(BatchCorrectedPhyloseq, OrdinationWeightedUnifrac, color="woundcarepain") + scale_colour_manual(values=Paincolors) + ggtitle("Principal Coordinates (Genus-level weighted UniFrac distance) Wound Pain") + theme_classic()
-PlotWeightedUnifracType = plot_ordination(BatchCorrectedPhyloseq, OrdinationWeightedUnifrac, color="wound_type") + scale_colour_manual(values=rando18_1) + ggtitle("Principal Coordinates (Genus-level weighted UniFrac distance) Wound Type") + theme_classic()
-PlotWeightedUnifracLoc= plot_ordination(BatchCorrectedPhyloseq, OrdinationWeightedUnifrac, color="woundloc") + scale_colour_manual(values=rando18_1) + ggtitle("Principal Coordinates (Genus-level weighted UniFrac distance) Wound Location") + theme_classic()
-
-
 # DMM Clustering 
 ################
 
 # Aggregated to Genus level and above
-
 # Test DMM on this
 Counts = BatchCorrectedPhyloseq@otu_table
 
@@ -83,9 +145,8 @@ Counts = BatchCorrectedPhyloseq@otu_table
 PrevalenceInfo = data.frame(Counts)
 PrevalenceInfo$Prevalence = rowSums(PrevalenceInfo != 0)
 
-sort(PrevalenceInfo$Prevalence)
-
-PrevalenceInfoFilter = PrevalenceInfo %>% filter(Prevalence >= 10)
+# .02*(nrow(BatchCorrectedPhyloseq@sam_data))
+PrevalenceInfoFilter = PrevalenceInfo %>% filter(Prevalence >=.02*(nrow(BatchCorrectedPhyloseq@sam_data) ))
 TaxaKeepDMM = row.names(PrevalenceInfoFilter)
 
 #
@@ -100,14 +161,17 @@ densityplot((colSums(CountsDMMinput)), xlim=range((colSums(CountsDMMinput))),xla
 
 FitDirichlets = mclapply(1:12, dmn, count=CountsDMMinput, verbose=TRUE, seed=19104)
 lplc <- sapply(FitDirichlets, laplace)
+
+# Save fit plot as fitplotDirichlet.jpeg
+jpeg("/Users/amycampbell/Documents/IowaWoundData2021/fitplotDirichlet.jpeg")
 plot(lplc, type = 'b', xlab = 'Dirichlet Components',ylab='Model Fit', main="Dirichlet Components by Laplace Model Fit (Genus Read Counts)") 
+dev.off()
 
 # get dirichlet fit object with maximum laplace-estimated likelihood (minimum negative)
 bestFit <- FitDirichlets[[which.min(lplc)]]
 
 GroupScores = data.frame(bestFit@group)
-
-
+ 
 # Highest scoring component for each sample is that sample's assignment
 GroupScores$assignment = sapply(1:nrow(GroupScores), function(x) which.max(GroupScores[x,]))
 GroupScores$SampleID = row.names(GroupScores)
@@ -136,24 +200,115 @@ SamDataForAssigning = SamDataForAssigning %>% mutate(woundloc_string = case_when
 
 
 
-
-
 BatchCorrectedPhyloseq@sam_data = sample_data(SamDataForAssigning)
-rownames(BatchCorrectedPhyloseq@sam_data) = sample_names(Specieslevel)
+rownames(BatchCorrectedPhyloseq@sam_data) = SamDataForAssigning$SampleID
 colnames(BatchCorrectedPhyloseq@sam_data) = colnames(SamDataForAssigning)
 
-# What are the most prevalent species?
-# Staphylococcus_NA, Bacillus_NA, Cutibacterium_NA, Delftia_NA, Streptococcus_NA
-MostPrev = row.names((PrevalenceInfo %>% arrange(-Prevalence))[1:20, ])
-BatchCorrectedPhyloseq@tax_table@.Data[MostPrev, ]
-hist(PrevalenceInfo$Prevalence)
+# Plot genera with top contributions to each DMM
+#################################################
+TaxRef = data.frame(BatchCorrectedPhyloseq@tax_table@.Data)
+TaxRef$GenusAdjusted = apply(TaxRef, 1, Genus_code)
 
-PlotTopGenera = BatchCorrectedPhyloseq
+TaxRef$OTU = row.names(TaxRef)
 
-#Genuslevel=Specieslevel %>% tax_glom(taxrank="Genus")
+Genera = TaxRef %>% select(OTU, GenusAdjusted)
+FittedVals = data.frame(bestFit@fit$Estimate)
 
-genusleveltax = data.frame(PlotTopGenera@tax_table@.Data)
-write.csv(genusleveltax, file="/Users/amycampbell/Documents/IowaWoundData2021/GenusLevelTaxTable.csv")
+Nclusters = ncol(FittedVals)
+colnames(FittedVals) =c(1:ncol(FittedVals))
+FittedVals$OTU = row.names(FittedVals)
+MeltedFitted = melt(FittedVals)
+colnames(MeltedFitted) = c("OTU", "Cluster", "Value")
+MeltedFitted = MeltedFitted %>% left_join(Genera, by="OTU")
+
+# modified from https://microbiome.github.io/tutorials/DMM.html
+ for (k in 1:Nclusters) {
+   dfmelt = MeltedFitted %>% filter(Cluster==k) %>% arrange(-abs(Value))
+   topOTUs = (dfmelt$OTU)[1:10]
+   print(paste0("Cluster:", k))
+   dfmelt = dfmelt %>% filter(OTU %in% topOTUs)
+   plot = ggplot(dfmelt, aes(x=Genus,y=Value)) + geom_bar(stat="identity") + coord_flip() + labs(title=paste("Top Contributors to Cluster ", k ))
+   plot$data$Genus = factor(plot$data$Genus, rev(dfmelt$Genus))
+   
+   ggsave(plot, file=paste0(paste0("/Users/amycampbell/Documents/IowaWoundData2021/DirichletContributorsCluster",k), ".png"))
+   }
+
+
+NMDSOrd <- ordinate(BatchCorrectedPhyloseq, "NMDS", "bray", weighted=T, trymax=200)
+BatchCorrectedPhyloseq@sam_data$assignment = factor(BatchCorrectedPhyloseq@sam_data$assignment)
+BatchCorrectedPhyloseq@sam_data$woundage = factor(BatchCorrectedPhyloseq@sam_data$woundage)
+
+
+
+
+
+
+# some Ordinations of interest
+###############################
+
+BatchCorrectedPhyloseq@sam_data$woundAgeCat = if_else(BatchCorrectedPhyloseq@sam_data$woundage %in% c(1,2,3), "Acute", "Chronic")
+BatchCorrectedPhyloseqNoModerates = subset_samples(BatchCorrectedPhyloseq, woundcarepain !=2)
+
+
+DMMordPlot = plot_ordination(BatchCorrectedPhyloseq, NMDSOrd, type="samples", color="assignment", title="Ordination of Genus-aggregated OTUs by DMM Assignment")  + scale_color_manual(values=rev(rando18_1[c(10, 11, 15, 17, 14, 1,8)]))
+ggsave(DMMordPlot, file="/Users/amycampbell/Documents/IowaWoundData2021/DMMordinationPlot.png")
+
+
+# Collapse obligate anaerobes into one group & visualize
+################################################################
+DF_Anaerobes = data.frame(BatchCorrectedPhyloseq@tax_table@.Data)
+
+DF_Anaerobes$X= row.names(DF_Anaerobes)
+
+AnaerobeMappingsReduced = AnaerobeMappings %>% select(X, Anaerobe) 
+DF_Anaerobes = DF_Anaerobes %>% left_join(AnaerobeMappingsReduced, by="X")
+DF_Anaerobes$Genus = as.character(DF_Anaerobes$Genus)
+savetaxanames = DF_Anaerobes$X
+
+DF_Anaerobes$X=NULL
+DF_Anaerobes$Species=NULL
+DF_Anaerobes  = DF_Anaerobes %>% mutate(Genus = case_when(Anaerobe==1 ~ "Anaerobes", 
+                                                                    Anaerobe==0 ~ Genus))
+
+DF_Anaerobes  = DF_Anaerobes %>% mutate(Genus = case_when(Anaerobe==1 ~ "Anaerobes", 
+                                                          Anaerobe==0 ~ Genus))
+
+
+#DF_Anaerobes$Anaerobe==NULL
+DF_Anaerobes$Family = as.character(DF_Anaerobes$Family)
+DF_Anaerobes  = DF_Anaerobes %>% mutate(Family = case_when(Anaerobe==1 ~ "Anaerobes", 
+                                                                    Anaerobe==0 ~ Family))
+
+DF_Anaerobes$Order = as.character(DF_Anaerobes$Order)
+DF_Anaerobes  = DF_Anaerobes %>% mutate(Order = case_when(Anaerobe==1 ~ "Anaerobes", 
+                                                           Anaerobe==0 ~ Order))
+
+DF_Anaerobes$Class = as.character(DF_Anaerobes$Class)
+DF_Anaerobes  = DF_Anaerobes %>% mutate(Class = case_when(Anaerobe==1 ~ "Anaerobes", 
+                                                          Anaerobe==0 ~ Class))
+
+DF_Anaerobes$Phylum = as.character(DF_Anaerobes$Phylum)
+DF_Anaerobes  = DF_Anaerobes %>% mutate(Phylum = case_when(Anaerobe==1 ~ "Anaerobes", 
+                                                          Anaerobe==0 ~ Phylum))
+
+BatchCorrectedPhyloseqRanking = BatchCorrectedPhyloseq
+rownames(DF_Anaerobes) = savetaxanames
+
+BatchCorrectedPhyloseqRanking@tax_table = tax_table(DF_Anaerobes)
+row.names(BatchCorrectedPhyloseqRanking@tax_table) =savetaxanames
+
+colnames(BatchCorrectedPhyloseqRanking@tax_table) = colnames(DF_Anaerobes)
+
+BatchCorrectedPhyloseqRanking = BatchCorrectedPhyloseqRanking %>% tax_glom(taxrank = "Genus")
+
+PostGlomTax = data.frame(BatchCorrectedPhyloseqRanking@tax_table@.Data)
+PostGlomTax$GenusAdjust = apply(PostGlomTax, 1, Genus_code)
+
+PlotTopGenera = BatchCorrectedPhyloseqRanking
+PlotTopGenera@tax_table = tax_table(PostGlomTax)
+row.names(PlotTopGenera@tax_table) = row.names(PostGlomTax)
+colnames(PlotTopGenera@tax_table) = colnames(PostGlomTax)
+
 
 row.names(PlotTopGenera@sam_data) = BatchCorrectedPhyloseq@sam_data$SampleID
 PlotTopGenera = PlotTopGenera %>% transform_sample_counts(function(x) {x/sum(x)})
@@ -161,81 +316,216 @@ PlotTopGenera = PlotTopGenera %>% transform_sample_counts(function(x) {x/sum(x)}
 PlotTopGenera1 = subset_samples(PlotTopGenera, assignment==1)
 PlotTopGenera2 = subset_samples(PlotTopGenera, assignment==2)
 PlotTopGenera3 = subset_samples(PlotTopGenera, assignment==3)
+
 PlotTopGenera4 = subset_samples(PlotTopGenera, assignment==4)
-PlotTopGenera5 = subset_samples(PlotTopGenera, assignment==5)
+# PlotTopGenera5 = subset_samples(PlotTopGenera, assignment==5)
 
 topdf1 = data.frame(PlotTopGenera1@otu_table@.Data)
 topdf1$rowmean = rowMeans(topdf1)
-topGenera = row.names( topdf1 %>% arrange(-rowmean))[1:9]
-
+topGenera = row.names( topdf1 %>% arrange(-rowmean))[1:12]
 
 topdf2 = data.frame(PlotTopGenera2@otu_table@.Data)
 topdf2$rowmean = rowMeans(topdf2)
-topGenera = append(topGenera, row.names( topdf2 %>% arrange(-rowmean))[1:9])
+topGenera = append(topGenera, row.names( topdf2 %>% arrange(-rowmean))[1:12])
 
 topdf3 = data.frame(PlotTopGenera3@otu_table@.Data)
 topdf3$rowmean = rowMeans(topdf3)
-topGenera = append(topGenera, row.names( topdf3 %>% arrange(-rowmean))[1:9])
+topGenera = append(topGenera, row.names( topdf3 %>% arrange(-rowmean))[1:12])
 
 topdf4 = data.frame(PlotTopGenera4@otu_table@.Data)
 topdf4$rowmean = rowMeans(topdf4)
-topGenera = append(topGenera, row.names( topdf4 %>% arrange(-rowmean))[1:9])
+topGenera = append(topGenera, row.names( topdf4 %>% arrange(-rowmean))[1:12])
 
-topdf5 = data.frame(PlotTopGenera5@otu_table@.Data)
-topdf5$rowmean = rowMeans(topdf5)
-topGenera = append(topGenera, row.names( topdf5 %>% arrange(-rowmean))[1:9])
 
 topGenera = unique(topGenera)
 
-PlotTop9Genera = prune_taxa(topGenera, PlotTopGenera)
+PlotTop12Genera = prune_taxa(topGenera, PlotTopGenera)
 
 
-tax_labels = data.frame(PlotTop9Genera@tax_table@.Data) %>% select("Genus")
-tax_labels$Anaerobe = c(0,0,1, 0, 0, 1, 1, 1, 1,1,1,0, 0,1,1,0,1, 0)
-
-
-MeltedTop9 = PlotTop9Genera %>% psmelt() %>% select(Genus, Abundance, assignment, study_id)
-MeltedTop9 = MeltedTop9 %>% group_by(Genus, assignment) %>% summarise(mean(Abundance))
-MeltedTop9$abundance = MeltedTop9$`mean(Abundance)`
-ggplot(MeltedTop9, aes(x=as.factor(assignment), y=abundance, fill=Genus)) + geom_bar(stat = "identity", position = "stack",  color = NA) + scale_fill_manual(values=(rando18_1)) + theme_minimal() + ggtitle("Top 9 Genera in Each DMM Component (Average %)") + xlab("DMM Assignment") + ylab("% Abundance")
-
-
-
-AnaerobicInfoIncluded = MeltedTop9 %>% left_join(tax_labels, by="Genus")
-AnaerobicInfoIncluded = AnaerobicInfoIncluded %>% mutate(anaerobicGenus = case_when(Anaerobe==1~ "Anaerobes", 
-                                                                                    Anaerobe==0 ~ toString(Genus[1])))
-ggplot(AnaerobicInfoIncluded, aes(x=as.factor(assignment), y=abundance, fill=anaerobicGenus)) + geom_bar(stat = "identity", position = "stack",  color = NA) + scale_fill_manual(values=(randocolor18)) + theme_minimal() + ggtitle("Top 9 Genera in Each DMM Component (Average %, Anaerobes Grouped Together)") + xlab("DMM Assignment") + ylab("% Abundance")
-
-
-
+MeltedTop12 = PlotTop12Genera %>% psmelt() %>% select(GenusAdjust, Abundance, assignment, study_id, )
+MeltedTop12 = MeltedTop12 %>% group_by(GenusAdjust, assignment) %>% summarise(mean(Abundance))
+MeltedTop12$abundance = MeltedTop12$`mean(Abundance)`
+generapresent  = ggplot(MeltedTop12, aes(x=as.factor(assignment), y=abundance, fill=GenusAdjust)) + geom_bar(stat = "identity", position = "stack",  color = NA) + scale_fill_manual(values=(color21)) + theme_minimal() + ggtitle("Top 12 Genera in Each DMM Component (Average %)") + xlab("DMM Assignment") + ylab("% Abundance")
+ggsave(generapresent, file="/Users/amycampbell/Documents/IowaWoundData2021/TopGeneraDMMsWithoutMock.png")
 
 SampleDist = data.frame(PlotTopGenera@sam_data)
-ggplot(SampleDist, aes(x=factor(assignment), fill=factor(wound_type_string))) +
+
+woundtypePlot = ggplot(SampleDist, aes(x=factor(assignment), fill=factor(wound_type_string))) +
   geom_bar() + scale_fill_manual(values=rev(randpalette32)) + theme_minimal()  + ggtitle("Wound Types by DMM Assignment") +xlab("DMM Assignment") 
 
-ggplot(SampleDist, aes(x=factor(assignment), fill=factor(woundloc_string))) +
+woundlocPlot = ggplot(SampleDist, aes(x=factor(assignment), fill=factor(woundloc_string))) +
   geom_bar() + scale_fill_manual(values=rev(randpalette32)) + theme_minimal()  + ggtitle("Wound Locations by DMM Assignment") +xlab("DMM Assignment") 
 
-
-
 runplot = ggplot(SampleDist, aes(x=factor(assignment), fill=factor(Run))) +
-  geom_bar() + scale_fill_manual(values=c("#FFFFCC", "#FFB266", "#CC6600", "#990000", "#E0E0E0")) + theme_minimal()  + ggtitle("Run by DMM Assignment") +xlab("DMM Assignment") 
+  geom_bar() + scale_fill_manual(values=twocolor) + theme_minimal()  + ggtitle("Sequencing Run by DMM Assignment") +xlab("DMM Assignment") 
 
-runplot = ggplot(SampleDist, aes(x=factor(assignment), fill=factor(Run))) +
-  geom_bar() + scale_fill_manual(values=twocolor) + theme_minimal()  + ggtitle("Run by DMM Assignment") +xlab("DMM Assignment") 
+timeplot1 = ggplot(SampleDist, aes(x=factor(assignment), fill=factor(woundage))) +
+  geom_bar() + scale_fill_manual(values=timepalette) + theme_minimal()  + ggtitle("Wound age by DMM Assignment") +xlab("DMM Assignment") 
+
+SampleDistPlot = gridExtra::grid.arrange(woundtypePlot, woundlocPlot, runplot, timeplot1)
+ggsave(SampleDistPlot, width=10, height=8, file="/Users/amycampbell/Documents/IowaWoundData2021/SampleDistPlot22.pdf")
 
 
+painplot1 = ggplot(SampleDist, aes(x=factor(assignment), fill=factor(woundcarepain))) +
+  geom_bar() + scale_fill_manual(values=c("#FFFFCC", "#FFB266", "#CC6600", "#990000", "#E0E0E0")) + theme_minimal()  + ggtitle("Wound pain by DMM Assignment") +xlab("DMM Assignment") +  theme(legend.position = "None")
 
 painplot2 = ggplot(SampleDist, aes(x=factor(assignment), fill=factor(woundcarepain))) +
-  geom_bar(position="fill") + scale_fill_manual(values=c("#FFFFCC", "#FFB266", "#CC6600", "#990000", "#E0E0E0")) + theme_minimal()  + ggtitle("Wound pain by DMM Assignment") +xlab("DMM Assignment") 
+  geom_bar(position="fill") + scale_fill_manual(values=c("#FFFFCC", "#FFB266", "#CC6600", "#990000", "#E0E0E0")) + theme_minimal()  + ggtitle("Wound pain by DMM Assignment") +xlab("DMM Assignment") + ylab("Proportion")
+
+SampleDistNoModerates = SampleDist %>% filter(woundcarepain!=2)
+painplot3 = ggplot(SampleDistNoModerates, aes(x=factor(assignment), fill=factor(woundcarepain))) +
+  geom_bar() + scale_fill_manual(values=c("#FFFFCC", "#FFB266", "#990000", "#E0E0E0")) + theme_minimal()  + ggtitle("Wound pain by DMM Assignment") +xlab("DMM Assignment") + ylab("Proportion") +  theme(legend.position = "None")
+painplot4 = ggplot(SampleDistNoModerates, aes(x=factor(assignment), fill=factor(woundcarepain))) +
+  geom_bar(position="fill") + scale_fill_manual(values=c("#FFFFCC", "#FFB266", "#990000", "#E0E0E0")) + theme_minimal()  + ggtitle("Wound pain by DMM Assignment") +xlab("DMM Assignment") + ylab("Proportion")
+
+SamplePainPlot = gridExtra::grid.arrange(painplot1, painplot2, painplot3, painplot4, ncol=2, widths=c(8, 10))
+ggsave(SamplePainPlot, width=10, height=8, file="/Users/amycampbell/Documents/IowaWoundData2021/SamplePainPlot22.pdf")
 
 
 
 save(BatchCorrectedPhyloseq, file="/Users/amycampbell/Documents/IowaWoundData2021/BatchCorrectedPhyloseqWithDMMs.rda")
 
+countplot = ggplot(SampleDist, aes(y=TotalOTUsLeftBatchMitoChloro, x=assignment)) + geom_boxplot(fill="#CC6600") + xlab("DMM Component ") + ylab("Total #OTUs/ASVs") + theme_classic()
+Shannonplot = plot_richness(BatchCorrectedPhyloseq, x="assignment", measures=c("Shannon")) + geom_boxplot(fill="#CC6600") + theme_classic() + xlab("DMM Component") + ylab("Shannon Diversity")
+Richnessplot = plot_richness(BatchCorrectedPhyloseq, x="assignment", measures=c("Observed")) + geom_boxplot(fill="#CC6600") + theme_classic() + xlab("DMM Component") + ylab("Shannon Diversity")
+gridExtra::grid.arrange(countplot, Shannonplot, Richnessplot, ncol=3)
+
+#  Extract these diversity metrics for adding to the DF later 
+RichnessDF = Richnessplot$data %>% select(SampleID, value)
+colnames(RichnessDF) = c("SampleID", "Genus_Richness")
+ShannonDF = Shannonplot$data %>% select(SampleID, value)
+colnames(ShannonDF) =  c("SampleID", "Genus_Shannon")
 
 
+# 1 = <7 days
+# 2 = 8-30 days
+# 3 = 31 days to 90 days
+# 4 = 91 days to 1 year#
+# 5 = >1 year
+#90E0EF # lowest blue
+#0077B6 #high blue
+#ECB02B # low orange 
+#E75E02 high orange
+#840404 high red
+#D3D3D3 gray
+
+# Final dataframe for SEG
+##########################
+FinalDF = SamDataForAssigning %>% select(SampleID, study_id, assignment)
+colnames(FinalDF) = c("SampleID", "StudyID", "DMMClusterAssign")
+dim(FinalDF)
+
+# Highest phylum per sample & its abundance
+######################################################
+BatchCorrectedPhyloseqPhylum = BatchCorrectedPhyloseq %>% tax_glom(taxrank="Phylum")
+PhylumTaxDF = data.frame(BatchCorrectedPhyloseqPhylum@tax_table@.Data)
+PhylumTaxDF$HighestPhylum = row.names(PhylumTaxDF) 
+PhylumTaxDF = PhylumTaxDF %>% select(Phylum, HighestPhylum)
+
+DF_forMax_Phylum = data.frame(t(BatchCorrectedPhyloseqPhylum@otu_table@.Data))
+
+RowSumsPhylum = rowSums(DF_forMax_Phylum)
+MaxCountPhylum = apply(DF_forMax_Phylum,1,max)
+
+DF_forMax_Phylum$HighestPhylum = colnames(DF_forMax_Phylum)[apply(DF_forMax_Phylum,1,which.max)]
+DF_forMax_Phylum$HighestPhylum = sapply(DF_forMax_Phylum$HighestPhylum, function(x) str_remove(x, "X"))
+
+DF_forMax_Phylum$MaxPhylumAbundance = MaxCountPhylum/RowSumsPhylum
+
+DF_forMax_Phylum$SampleID = row.names(DF_forMax_Phylum)
+DF_forMax_Phylum = DF_forMax_Phylum %>% left_join(PhylumTaxDF, by="HighestPhylum")
+DF_forMax_Phylum = DF_forMax_Phylum %>% select(SampleID, Phylum, MaxPhylumAbundance)
+
+FinalDF = FinalDF %>% left_join(DF_forMax_Phylum, by="SampleID")
+colnames(FinalDF) = c("SampleID", "StudyID", "DMMClusterAssign", "Most_Abundant_Phylum","Phylum_Abundance")
 
 
+# Highest genus-level(or next highest) grouping per sample & its abundance
+###########################################################################
+
+DF_ForMax_Genus = data.frame(t(BatchCorrectedPhyloseq@otu_table@.Data))
+
+GenusTaxDF = data.frame(BatchCorrectedPhyloseq@tax_table@.Data)
+GenusTaxDF$GenusAdjust = apply(GenusTaxDF, 1, Genus_code)
+
+GenusTaxDF$HighestGenus = row.names(GenusTaxDF) 
+GenusTaxDF = GenusTaxDF %>% select(GenusAdjust, HighestGenus)
+
+RowSumsGenus = rowSums(DF_ForMax_Genus)
+MaxCountGenus = apply(DF_ForMax_Genus,1,max)
 
 
+DF_ForMax_Genus$HighestGenus = colnames(DF_ForMax_Genus)[apply(DF_ForMax_Genus,1,which.max)]
+DF_ForMax_Genus$HighestGenus = sapply(DF_ForMax_Genus$HighestGenus, function(x) str_remove(x, "X"))
+DF_ForMax_Genus$MaxGenusAbundance =  MaxCountGenus/RowSumsGenus
+
+DF_ForMax_Genus$SampleID = row.names(DF_ForMax_Genus)
+DF_ForMax_Genus = DF_ForMax_Genus %>% left_join(GenusTaxDF,by="HighestGenus")
+DF_ForMax_Genus = DF_ForMax_Genus %>% select(SampleID, GenusAdjust, MaxGenusAbundance)
+colnames(DF_ForMax_Genus) = c("SampleID", "Most_Abundant_Genus","Genus_Abundance")
+
+FinalDF = FinalDF %>% left_join(DF_ForMax_Genus, by="SampleID")
+
+# Some genera of interest
+##########################
+
+BatchCorrectedPhyloseqRankingPercent = BatchCorrectedPhyloseqRanking %>%transform_sample_counts(function(x) {x/sum(x)})
+CLRTransformedPct = microbiome::transform(BatchCorrectedPhyloseqRankingPercent,transform="clr" )
+
+MeltedPct = BatchCorrectedPhyloseqRankingPercent %>% psmelt()
+MeltedCLR = CLRTransformedPct %>% psmelt()
+
+# Corynebacterium 
+CorynePcts = MeltedPct %>% filter(Genus=="Corynebacterium") %>% select(SampleID, Abundance)
+colnames(CorynePcts) = c("SampleID", "CorynebacteriumAbundance")
+CoryneCLRs = MeltedCLR %>% filter(Genus=="Corynebacterium") %>% select(SampleID, Abundance)
+colnames(CoryneCLRs) = c("SampleID", "CorynebacteriumAbundance_CLR")
+
+FinalDF = FinalDF %>% left_join(CorynePcts, by="SampleID")
+FinalDF = FinalDF %>% left_join(CoryneCLRs, by="SampleID")
+
+# Streptococcus 
+StrepPcts = MeltedPct %>% filter(Genus=="Streptococcus") %>% select(SampleID, Abundance)
+colnames(StrepPcts) = c("SampleID", "StreptococcusAbundance")
+StrepCLRs = MeltedCLR %>% filter(Genus=="Streptococcus") %>% select(SampleID, Abundance)
+colnames(StrepCLRs) = c("SampleID", "StreptococcusAbundance_CLR")
+
+FinalDF = FinalDF %>% left_join(StrepPcts, by="SampleID")
+FinalDF = FinalDF %>% left_join(StrepCLRs, by="SampleID")
+
+
+# Staphylococcus  
+StaphPcts = MeltedPct %>% filter(Genus=="Staphylococcus") %>% select(SampleID, Abundance)
+colnames(StaphPcts) = c("SampleID", "StaphylococcusAbundance")
+StaphCLRs = MeltedCLR %>% filter(Genus=="Staphylococcus") %>% select(SampleID, Abundance)
+colnames(StaphCLRs) = c("SampleID", "StaphylococcusAbundance_CLR")
+
+FinalDF = FinalDF %>% left_join(StaphPcts, by="SampleID")
+FinalDF = FinalDF %>% left_join(StaphCLRs, by="SampleID")
+
+
+# Pseudomonas   
+PseudPcts = MeltedPct %>% filter(Genus=="Pseudomonas") %>% select(SampleID, Abundance)
+colnames(PseudPcts) = c("SampleID", "PseudomonasAbundance")
+PseudCLRs = MeltedCLR %>% filter(Genus=="Pseudomonas") %>% select(SampleID, Abundance)
+colnames(PseudCLRs) = c("SampleID", "PseudomonasAbundance_CLR")
+
+FinalDF = FinalDF %>% left_join(PseudPcts, by="SampleID")
+FinalDF = FinalDF %>% left_join(PseudCLRs, by="SampleID")
+
+
+# Anaerobes   
+AnaerobePcts = MeltedPct %>% filter(Genus=="Anaerobes") %>% select(SampleID, Abundance)
+colnames(AnaerobePcts) = c("SampleID", "AnaerobicGenusAbundance")
+AnaerobeCLRs = MeltedCLR %>% filter(Genus=="Anaerobes") %>% select(SampleID, Abundance)
+colnames(AnaerobeCLRs) = c("SampleID", "AnaerobicGenusAbundance_CLR")
+
+FinalDF = FinalDF %>% left_join(AnaerobePcts, by="SampleID")
+FinalDF = FinalDF %>% left_join(AnaerobeCLRs, by="SampleID")
+
+# Add richness info
+FinalDF = FinalDF %>% left_join(RichnessDF, by="SampleID")
+FinalDF = FinalDF %>% left_join(ShannonDF, by="SampleID")
+
+
+write.csv(FinalDF, file="/Users/amycampbell/Documents/IowaWoundData2021/WoundMicrobiomeDataForSEG_AEC.csv")

@@ -279,7 +279,6 @@ Controls35@sam_data$Sample_Ctrl = paste(Controls35@sam_data$SampleID, Controls35
 plot_bar(Controls35, "Sample_Ctrl", fill="Phylum") + scale_fill_manual(values=randpalette32) + ggtitle("OTUs of phyla in MiSeqV1V3_35 controls")
 
 
-
 # ignore empty wells
 Controls35 = subset_samples(Controls35, ControlStatus!="Empty")
 waterphyla35 = plot_bar(Controls35, "SampleID", fill="Phylum") + scale_fill_manual(values=randpalette32) + ggtitle("Run 35 Water Control Phyla")
