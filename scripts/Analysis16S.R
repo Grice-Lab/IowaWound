@@ -274,7 +274,6 @@ DF_Anaerobes  = DF_Anaerobes %>% mutate(Genus = case_when(Anaerobe==1 ~ "Anaerob
                                                           Anaerobe==0 ~ Genus))
 
 
-#DF_Anaerobes$Anaerobe==NULL
 DF_Anaerobes$Family = as.character(DF_Anaerobes$Family)
 DF_Anaerobes  = DF_Anaerobes %>% mutate(Family = case_when(Anaerobe==1 ~ "Anaerobes", 
                                                                     Anaerobe==0 ~ Family))
@@ -316,9 +315,7 @@ PlotTopGenera = PlotTopGenera %>% transform_sample_counts(function(x) {x/sum(x)}
 PlotTopGenera1 = subset_samples(PlotTopGenera, assignment==1)
 PlotTopGenera2 = subset_samples(PlotTopGenera, assignment==2)
 PlotTopGenera3 = subset_samples(PlotTopGenera, assignment==3)
-
 PlotTopGenera4 = subset_samples(PlotTopGenera, assignment==4)
-# PlotTopGenera5 = subset_samples(PlotTopGenera, assignment==5)
 
 topdf1 = data.frame(PlotTopGenera1@otu_table@.Data)
 topdf1$rowmean = rowMeans(topdf1)

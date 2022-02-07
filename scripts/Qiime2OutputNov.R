@@ -361,7 +361,7 @@ MockCommGenusFilter= filter_taxa(MockCommGenus, function(x) mean(x) > 0, TRUE)
 GenusPlotMock = plot_bar(MockCommGenusFilter, x="SampleID", y="Abundance", fill="Genus") + scale_fill_manual(values=rev(ampalette)) + ggtitle("Mock Community Genera")
 ggsave(GenusPlotMock, file="/Users/amycampbell/Documents/IowaWoundData2021/MockCommunityGenera.png")
 
-#here#######################
+#######################
 # Add patient metadata
 #######################
 
