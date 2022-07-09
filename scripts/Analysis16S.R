@@ -7,13 +7,14 @@
 library("phyloseq")
 library("dplyr")
 library("stringr")
-library("decontam")
 library("ggplot2")
 library("vegan")
 library("ggpubr")
 library("lattice")
 library("DirichletMultinomial")
+library("parallel")
 library("reshape2")
+library("microbiome")
 # Set Random seed
 ##################
 set.seed(19104)
@@ -253,7 +254,10 @@ BatchCorrectedPhyloseqNoModerates = subset_samples(BatchCorrectedPhyloseq, wound
 DMMordPlot = plot_ordination(BatchCorrectedPhyloseq, NMDSOrd, type="samples", color="assignment", title="Ordination of Genus-aggregated OTUs by DMM Assignment")  + scale_color_manual(values=rev(rando18_1[c(10, 11, 15, 17, 14, 1,8)]))
 ggsave(DMMordPlot, file="/Users/amycampbell/Documents/IowaWoundData2021/DMMordinationPlot.png")
 
+dfresults = (data.frame(BatchCorrectedPhyloseq@sam_data) %>% select(SubjectID, assignment))
+resultssved = read.csv("Documents/IowaWoundData2021/PlotsForSue2022/WoundMicrobiomeDataForSEG_AEC.csv") %>% select(StudyID, DMMClusterAssign)
 
+topgenera = read.csv("Documents/IowaWoundData2021/PlotsForSue2022/WoundMicrobiomeDataForSEG_AEC.csv") %>% select(StudyID, Most_Abundant_Genus)
 # Collapse obligate anaerobes into one group & visualize
 ################################################################
 DF_Anaerobes = data.frame(BatchCorrectedPhyloseq@tax_table@.Data)
@@ -384,7 +388,7 @@ save(BatchCorrectedPhyloseq, file="/Users/amycampbell/Documents/IowaWoundData202
 
 countplot = ggplot(SampleDist, aes(y=TotalOTUsLeftBatchMitoChloro, x=assignment)) + geom_boxplot(fill="#CC6600") + xlab("DMM Component ") + ylab("Total #OTUs/ASVs") + theme_classic()
 Shannonplot = plot_richness(BatchCorrectedPhyloseq, x="assignment", measures=c("Shannon")) + geom_boxplot(fill="#CC6600") + theme_classic() + xlab("DMM Component") + ylab("Shannon Diversity")
-Richnessplot = plot_richness(BatchCorrectedPhyloseq, x="assignment", measures=c("Observed")) + geom_boxplot(fill="#CC6600") + theme_classic() + xlab("DMM Component") + ylab("Shannon Diversity")
+Richnessplot = plot_richness(BatchCorrectedPhyloseq, x="assignment", measures=c("Observed")) + geom_boxplot(fill="#CC6600") + theme_classic() + xlab("DMM Component") + ylab("Observed Genera")
 gridExtra::grid.arrange(countplot, Shannonplot, Richnessplot, ncol=3)
 
 #  Extract these diversity metrics for adding to the DF later 
@@ -410,7 +414,8 @@ colnames(ShannonDF) =  c("SampleID", "Genus_Shannon")
 ##########################
 FinalDF = SamDataForAssigning %>% select(SampleID, study_id, assignment)
 colnames(FinalDF) = c("SampleID", "StudyID", "DMMClusterAssign")
-dim(FinalDF)
+
+DF_Genera_Dominating5 = FinalDF
 
 # Highest phylum per sample & its abundance
 ######################################################
@@ -441,7 +446,7 @@ colnames(FinalDF) = c("SampleID", "StudyID", "DMMClusterAssign", "Most_Abundant_
 ###########################################################################
 
 DF_ForMax_Genus = data.frame(t(BatchCorrectedPhyloseq@otu_table@.Data))
-
+BackupDF_ForMax = DF_ForMax_Genus
 GenusTaxDF = data.frame(BatchCorrectedPhyloseq@tax_table@.Data)
 GenusTaxDF$GenusAdjust = apply(GenusTaxDF, 1, Genus_code)
 
@@ -463,8 +468,37 @@ colnames(DF_ForMax_Genus) = c("SampleID", "Most_Abundant_Genus","Genus_Abundance
 
 FinalDF = FinalDF %>% left_join(DF_ForMax_Genus, by="SampleID")
 
-# Some genera of interest
-##########################
+###############################################################################################
+# Take and report the genera which are "most abundant" genus in at least 5 (>1% of 406) samples
+##############################################################################################
+MostAbundantGenusTable = rev(sort(table(FinalDF$Most_Abundant_Genus)))
+FiveorMore = names(MostAbundantGenusTable[MostAbundantGenusTable>=5])
+
+FiveOrMorePhyloseq = BatchCorrectedPhyloseq %>%transform_sample_counts(function(x) {x/sum(x)})
+FiveOrMorePhyloseqCLR = microbiome::transform(FiveOrMorePhyloseq,transform="clr" )
+DF_For_FiveOrMoreGeneraCLR = data.frame((FiveOrMorePhyloseqCLR@otu_table@.Data))
+TopGeneraOTUnames = data.frame(BatchCorrectedPhyloseq@tax_table@.Data) %>% filter(Genus %in% FiveorMore)
+
+
+FiveOrMoreGenera = data.frame(Genus = TopGeneraOTUnames$Genus)
+FiveOrMoreGenera$otu = rownames(TopGeneraOTUnames)
+
+DF_For_FiveOrMoreGeneraCLR$otu = row.names(DF_For_FiveOrMoreGeneraCLR)
+DF_For_FiveOrMoreGeneraCLR = DF_For_FiveOrMoreGeneraCLR %>% filter(otu %in% FiveOrMoreGenera$otu)
+FiveOrMoreGenera = FiveOrMoreGenera %>% left_join(DF_For_FiveOrMoreGeneraCLR, by="otu")
+FiveOrMoreGenera = FiveOrMoreGenera %>% select(-otu)
+row.names(FiveOrMoreGenera) = FiveOrMoreGenera$Genus
+FiveOrMoreGenera = FiveOrMoreGenera %>% select(-Genus)
+FiveOrMoreGeneraDF = data.frame(t(FiveOrMoreGenera))
+FiveOrMoreGeneraDF$SampleID = row.names(FiveOrMoreGeneraDF)
+FiveOrMoreGeneraDF$SampleID = stringr::str_remove(FiveOrMoreGeneraDF$SampleID, "X")
+
+DF_Genera_Dominating5 = FiveOrMoreGeneraDF %>% left_join(DF_Genera_Dominating5, by="SampleID")
+write.csv(DF_Genera_Dominating5, file="/Users/amycampbell/Documents/IowaWoundData2021/WoundAbundanceData_CLR_DominantGenera.csv")
+
+
+# Some genera of interest (Data sent to SEG in February 2022)
+##############################################################
 
 BatchCorrectedPhyloseqRankingPercent = BatchCorrectedPhyloseqRanking %>%transform_sample_counts(function(x) {x/sum(x)})
 CLRTransformedPct = microbiome::transform(BatchCorrectedPhyloseqRankingPercent,transform="clr" )
@@ -526,3 +560,4 @@ FinalDF = FinalDF %>% left_join(ShannonDF, by="SampleID")
 
 
 write.csv(FinalDF, file="/Users/amycampbell/Documents/IowaWoundData2021/WoundMicrobiomeDataForSEG_AEC.csv")
+
