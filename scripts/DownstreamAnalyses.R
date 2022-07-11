@@ -6,7 +6,10 @@ library("stringr")
 library("ggplot2")
 library("ggpubr")
 library("reshape2")
+library("viridis")
+library("gplots")
 
+# Just distinguish "old" from "new" genera amounts (which should be the same for dominant genera included before)
 AddCLRDes = function(namestring){
   if(!(namestring %in% c("X", "SampleID", "StudyID", "DMMClusterAssign"))){
     return(paste0(namestring,"CLR"))
@@ -46,10 +49,13 @@ CytokineDataNonNAInclude = CytokineDataNonNA %>% filter(Target.Name %in% names(C
 ClinicalDataAllIDs = data.frame(study_id = unique(ClinicalData$study_id))
 ClinicalData$study_id = sapply(ClinicalData$study_id, toString)
 ClinicalDataAllIDs$study_id = sapply(ClinicalDataAllIDs$study_id, toString)
+
+# 2^-(DELTA CT) FOR EACH CYTOKINE
 for(target in names(CytokineDataNonNAGr20)){
   print(target)
   LittleSubset = CytokineDataNonNAInclude %>% filter(Target.Name==target) %>% select(study_id, Delta.Ct.Mean) 
   colnames(LittleSubset) = c("study_id",target )
+  LittleSubset[, target] = 2^-(LittleSubset[, target])
   ClinicalDataAllIDs = ClinicalDataAllIDs %>% left_join(LittleSubset, by="study_id")
     
 }
@@ -85,7 +91,6 @@ ggsave(DataAvailablePlot + xlab("Patient") + ylab("Biological Variable"), file="
 
 
 
-# Log-fold changes for Moderate/Severe vs. Mild/None? the deltadeltaCT method?
 # Test for differences, visualize that way if we have something to show
 ###############################################################################
 FullData = FullData %>% left_join(ClinicalData %>% select(study_id, woundcarepain))
@@ -100,6 +105,8 @@ listCytokines = c("ARG1-Hs00163660_m1",  "C3-Hs00163811_m1",  "C5AR1-Hs00704891_
 "IL6-Hs00174131_m1", "LCN2-Hs01008571_m1", "MMP1-Hs00899658_m1", "MMP2-Hs01548727_m1", "MMP9-Hs00957562_m1", "TNF-Hs00174128_m1")
 
 
+
+
 listPvalues = c()
 listcytokinesTested = c()
 listPvaluesNoneVsSevere = c()
@@ -111,35 +118,93 @@ for(cyt in listCytokines){
 }
 
 
+listkruskalCytokinesDMM = c()
+listkruskalPs = c()
+for(cyt in listCytokines){
+  testresult = kruskal.test(FullData[,cyt] ~ FullData[,"DMMClusterAssign"])  
+  listkruskalPs = c(listkruskalPs, testresult$p.value)
+  listkruskalCytokinesDMM = c(listkruskalCytokinesDMM, cyt)
+  
+}
 
+# Cytokines with significant KW p values adjusted
+##################################################
+for(cyt in listCytokines){
+  if(cyt %in% c("C5AR1-Hs00704891_s1","CXCL8-Hs00174103_m1", "IL1B-Hs01555410_m1", "MMP2-Hs01548727_m1")){
+    
+    print(cyt)
+    print(pairwise.wilcox.test(FullData[,cyt],factor(FullData[,"DMMClusterAssign"]), p.adjust.method = "BH") )
+  }
+}
 
 
 
 DataFrameCytokinePain = data.frame(pvals = listPvalues, Cytokine=listcytokinesTested)
 DataFrameCytokinePain$PAdjust = p.adjust(DataFrameCytokinePain$pvals, method="BH")
 
-# Ugh how to calculate Fold change 
-####################################
-geo_mean = function(x, na.rm=TRUE){
-  exp(sum(log(x[x > 0]), na.rm=na.rm) / length(x))
+
+
+DataFrameCytokineDMMs = data.frame(pvalsKruskalWallis =listkruskalPs, Cytokine=listkruskalCytokinesDMM )
+DataFrameCytokineDMMs$PAdjustKW = p.adjust(DataFrameCytokineDMMs$pvalsKruskalWallis, method="BH")
+
+CytokineDataBySample = FullData %>% select(listCytokines, study_id, PainCatBinary, DMMClusterAssign, woundcarepain)
+
+numCytokines = FullDataDataPresent %>% select(-woundcarepain,-DMMClusterAssign ) 
+numCytokines$Ncyt = rowSums(numCytokines[2:ncol(numCytokines)])
+
+MeltCytokineDataBySample
+
+CytokineDataBySample = CytokineDataBySample %>% left_join(numCytokines %>% select(study_id, Ncyt),  by ="study_id")
+CytokineDataBySample_RemoveZeroCytokine = CytokineDataBySample %>% filter(Ncyt > 0 )
+MeltCytokineDataBySample = CytokineDataBySample_RemoveZeroCytokine %>% reshape2::melt(id.vars=(c("woundcarepain", "DMMClusterAssign", "PainCatBinary", "study_id", "Ncyt")))
+
+orderHeatMap = unique((CytokineDataBySample %>% arrange(DMMClusterAssign, Ncyt))$study_id)
+orderHeatMap = unique((CytokineDataBySample %>% arrange(woundcarepain, Ncyt))$study_id)
+
+CytokineBySubjectPlot = ggplot(MeltCytokineDataBySample, aes(x=study_id, y=variable, fill=log2(value))) + geom_tile() + scale_fill_viridis(option="plasma", na.value="white")
+CytokineBySubjectPlot$data$study_id = factor(CytokineBySubjectPlot$data$study_id, levels=orderHeatMap)
+CytokineBySubjectPlot$data$variable = factor(CytokineBySubjectPlot$data$variable, levels=names(rev(sort(CytokineDataNonNAGr20))))
+
+CytokineBySubjectPlot + theme_classic() + theme(axis.text.x=element_text(angle=70, hjust=.5, vjust=.5))
+
+
+
+# DMM vs. markers
+# "C5AR1-Hs00704891_s1","CXCL8-Hs00174103_m1", "IL1B-Hs01555410_m1", "MMP2-Hs01548727_m1"
+FullDataContainsMicrobiome = FullData %>% filter(!is.na(DMMClusterAssign))
+c5ar1plot = ggplot(FullDataContainsMicrobiome, aes(x=factor(DMMClusterAssign), y=log2(`C5AR1-Hs00704891_s1` ))) + geom_boxplot(fill="gray87") + theme_classic() + xlab("Microbial Community Type (DMM Assignment)") + ylab("-∆CT") + ggtitle("C5AR1 Expression") + theme(plot.title=element_text(hjust=.5, size=20, face="bold"))
+cxcl8plot  =  ggplot(FullDataContainsMicrobiome, aes(x=factor(DMMClusterAssign), y=log2(`CXCL8-Hs00174103_m1` ))) + geom_boxplot(fill="gray87") + theme_classic() + xlab("Microbial Community Type (DMM Assignment)") + ylab("-∆CT")+ ggtitle("CXCL8 Expression")+ theme(plot.title=element_text(hjust=.5, size=20, face="bold"))
+ilbplot  =  ggplot(FullDataContainsMicrobiome, aes(x=factor(DMMClusterAssign), y=log2(`IL1B-Hs01555410_m1` ))) + geom_boxplot(fill="gray87") + theme_classic() + xlab("Microbial Community Type (DMM Assignment)") + ylab("-∆CT")+ ggtitle("IlB Expression")+ theme(plot.title=element_text(hjust=.5, size=20, face="bold"))
+
+ggplot(FullData, aes(x=log2(`CXCL8-Hs00174103_m1` ), y=log2(`IL1B-Hs01555410_m1`))) + geom_point()
+
+cor.test(log2(FullData$`CXCL8-Hs00174103_m1` ), log2(FullData$`IL1B-Hs01555410_m1`))
+
+FullData %>% select(listCytokines) %>% mutate_all(.funs=log2(.))
+
+
+# Correlations 
+JustCyt = log2(FullData %>% select(listCytokines) )
+colnames(JustCyt) = sapply(colnames(JustCyt) , function(x) str_split(x, pattern="-")[[1]][1])
+JustCytCor = cor(JustCyt, use="pairwise.complete.obs")
+
+CorrelationMat$p = "NA"
+for(r in 1:nrow(CorrelationMat)){
+  x=CorrelationMat[r, "Var1"]
+  y=CorrelationMat[r, "Var2"]
+  ctest = cor.test(JustCyt[,x], JustCyt[,y])
+  CorrelationMat[r, "p"] = as.numeric(ctest$p.value)
 }
 
-for(cyt in listCytokines){
-  CtrlValues = FullData[, c(cyt, "PainCatBinary")] %>% filter(PainCatBinary=="NoneMildModerate") 
-  print(CtrlValues)
-  FullData[, paste0(cyt, "_CtrlMean")]= geo_mean(CtrlValues[,cyt])
-  FullData[, paste0(cyt, "_TwoDeltaDeltaCT")] = 2^(-( (FullData[, cyt]) - (FullData[, paste0(cyt, "_CtrlMean")])))
-  
+CorrelationMatBonfNum = nrow(CorrelationMat %>% filter(Var1!=Var2))/2
+CorrelationMat$p = sapply(CorrelationMat$p, function(x) as.numeric(as.character(x)))
+CorrelationMat$pAdj = (CorrelationMat$p)*CorrelationMatBonfNum
+CorrelationMat = JustCytCor %>% reshape2::melt()
+View(CorrelationMat)
+CorrHeatMap = ggplot(CorrelationMat, aes(x=Var1, y=Var2, fill=value))+ geom_tile() + scale_fill_gradient2(high="red", low="blue", mid="white", midpoint=0) + xlab("") + ylab("") + ggtitle("Correlations Between Inflammatory\nMarker Expression (∆CT)") +theme_classic()+ theme(plot.title=element_text(size=20, hjust=.5), axis.text.x=element_text(size=15, angle=270), axis.text.y=element_text(size=15)) + labs(fill="Pearson's Correlation")
 
-}
+Hclustering = hclust(as.dist(1-JustCytCor))
 
-View(FullData)
-View(FullData %>% select(`IL6-Hs00174131_m1_CtrlMean`, PainCatBinary, `IL6-Hs00174131_m1_TwoDeltaDeltaCT`, `IL6-Hs00174131_m1`))
-
-log2(mean((FullData %>% filter(PainCatBinary!="NoneMildModerate"))$`IL1B-Hs01555410_m1_TwoDeltaDeltaCT`, na.rm=T) /  mean((FullData %>% filter(PainCatBinary=="NoneMildModerate"))$`IL1B-Hs01555410_m1_TwoDeltaDeltaCT`, na.rm=T))
-log2(mean((FullData %>% filter(PainCatBinary!="NoneMildModerate"))$`IL6-Hs00174131_m1_TwoDeltaDeltaCT`, na.rm=T) /  mean((FullData %>% filter(PainCatBinary=="NoneMildModerate"))$`IL6-Hs00174131_m1_TwoDeltaDeltaCT`, na.rm=T))
-log2(mean((FullData %>% filter(PainCatBinary!="NoneMildModerate"))$`IL1B-Hs01555410_m1_TwoDeltaDeltaCT`, na.rm=T) /  mean((FullData %>% filter(PainCatBinary=="NoneMildModerate"))$`IL1B-Hs01555410_m1_TwoDeltaDeltaCT`, na.rm=T))
-log2(mean((FullData %>% filter(PainCatBinary!="NoneMildModerate"))$`C5AR1-Hs00704891_s1_TwoDeltaDeltaCT`, na.rm=T) /  mean((FullData %>% filter(PainCatBinary=="NoneMildModerate"))$`C5AR1-Hs00704891_s1_TwoDeltaDeltaCT`, na.rm=T))
-
-
-
+CorrHeatMap$data$Var1 = factor(CorrHeatMap$data$Var1, levels=(Hclustering$labels)[Hclustering$order])
+CorrHeatMap$data$Var2 = factor(CorrHeatMap$data$Var2, levels=(Hclustering$labels)[Hclustering$order])
+CorrHeatMap
