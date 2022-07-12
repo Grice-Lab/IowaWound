@@ -8,6 +8,11 @@ library("ggpubr")
 library("reshape2")
 library("viridis")
 library("gplots")
+library("rstatix")
+
+# Imputed PCA functions
+library("missMDA")
+library("FactoMineR")
 
 # Just distinguish "old" from "new" genera amounts (which should be the same for dominant genera included before)
 AddCLRDes = function(namestring){
@@ -174,7 +179,10 @@ CytokineBySubjectPlot + theme_classic() + theme(axis.text.x=element_text(angle=7
 FullDataContainsMicrobiome = FullData %>% filter(!is.na(DMMClusterAssign))
 c5ar1plot = ggplot(FullDataContainsMicrobiome, aes(x=factor(DMMClusterAssign), y=log2(`C5AR1-Hs00704891_s1` ))) + geom_boxplot(fill="gray87") + theme_classic() + xlab("Microbial Community Type (DMM Assignment)") + ylab("-∆CT") + ggtitle("C5AR1 Expression") + theme(plot.title=element_text(hjust=.5, size=20, face="bold"))
 cxcl8plot  =  ggplot(FullDataContainsMicrobiome, aes(x=factor(DMMClusterAssign), y=log2(`CXCL8-Hs00174103_m1` ))) + geom_boxplot(fill="gray87") + theme_classic() + xlab("Microbial Community Type (DMM Assignment)") + ylab("-∆CT")+ ggtitle("CXCL8 Expression")+ theme(plot.title=element_text(hjust=.5, size=20, face="bold"))
-ilbplot  =  ggplot(FullDataContainsMicrobiome, aes(x=factor(DMMClusterAssign), y=log2(`IL1B-Hs01555410_m1` ))) + geom_boxplot(fill="gray87") + theme_classic() + xlab("Microbial Community Type (DMM Assignment)") + ylab("-∆CT")+ ggtitle("IlB Expression")+ theme(plot.title=element_text(hjust=.5, size=20, face="bold"))
+ilbplot  =  ggplot(FullDataContainsMicrobiome, aes(x=factor(DMMClusterAssign), y=log2(`IL1B-Hs01555410_m1` ))) + geom_boxplot(fill="gray87") + theme_classic() + xlab("Microbial Community Type (DMM Assignment)") + ylab("-∆CT")+ ggtitle("Il-1B Expression")+ theme(plot.title=element_text(hjust=.5, size=20, face="bold"))
+MMP2plot  =  ggplot(FullDataContainsMicrobiome, aes(x=factor(DMMClusterAssign), y=log2(`MMP2-Hs01548727_m1` ))) + geom_boxplot(fill="gray87") + theme_classic() + xlab("Microbial Community Type (DMM Assignment)") + ylab("-∆CT")+ ggtitle("MMP2 Expression")+ theme(plot.title=element_text(hjust=.5, size=20, face="bold"))
+
+gridExtra::grid.arrange(c5ar1plot, cxcl8plot, ilbplot, MMP2plot)
 
 ggplot(FullData, aes(x=log2(`CXCL8-Hs00174103_m1` ), y=log2(`IL1B-Hs01555410_m1`))) + geom_point()
 
@@ -185,6 +193,9 @@ FullData %>% select(listCytokines) %>% mutate_all(.funs=log2(.))
 
 # Correlations 
 JustCyt = log2(FullData %>% select(listCytokines) )
+prcomp(JustCyt, na.omit)
+
+
 colnames(JustCyt) = sapply(colnames(JustCyt) , function(x) str_split(x, pattern="-")[[1]][1])
 JustCytCor = cor(JustCyt, use="pairwise.complete.obs")
 
@@ -207,4 +218,63 @@ Hclustering = hclust(as.dist(1-JustCytCor))
 
 CorrHeatMap$data$Var1 = factor(CorrHeatMap$data$Var1, levels=(Hclustering$labels)[Hclustering$order])
 CorrHeatMap$data$Var2 = factor(CorrHeatMap$data$Var2, levels=(Hclustering$labels)[Hclustering$order])
-CorrHeatMap
+
+
+
+
+
+# PCA with missing values on the cytokines
+############################################
+dim(JustCyt)
+dim(FullData)
+2^(-5.928095e-06 )
+
+JustCytPCA = FullData %>% select(listCytokines, study_id)
+JustCytPCA[,1:(ncol(JustCytPCA) - 1)] <- log2(JustCytPCA[,1:(ncol(JustCytPCA) - 1)])
+
+JustCytPCA$NumMissing = rowSums(is.na(JustCytPCA))
+
+JustCytPCA = JustCytPCA %>% filter(NumMissing < 7)
+
+JustCytPCASubset = JustCytPCA %>% select(-NumMissing, -study_id)
+
+ncompEst <- estim_ncpPCA(JustCytPCASubset,method.cv = "Kfold", verbose = FALSE) 
+plot(0:5, ncompEst$criterion, xlab = "nb dim", ylab = "MSEP")
+ImputedCytokinePCA = imputePCA(JustCytPCASubset, ncp = ncompEst$ncp)
+dim(ImputedCytokinePCA$completeObs)
+ImputedCytokinePCA = cbind(ImputedCytokinePCA$completeObs, JustCytPCA %>% select(study_id))
+ImputedCytokinePCA$study_id = factor(ImputedCytokinePCA$study_id)
+ImputedCytokinePCA = ImputedCytokinePCA %>% left_join(ClinicalData %>% select(study_id, wound_type,woundage,woundloc ), by="study_id") %>% select(-study_id, -woundloc,-wound_type)
+ImputedCytokinePCA$woundage = sapply(ImputedCytokinePCA$woundage, function(x) as.character(x))
+dim(ImputedCytokinePCA)
+PCA_on_ImputatedVals <- PCA(ImputedCytokinePCA, quali.sup = 14, ncp = ncompEst$ncp, graph=FALSE)
+PCA_on_ImputatedVals$var
+PCA_on_ImputatedVals$quali.sup
+plot(PCA_on_ImputatedVals, lab="none", habillage = 14, axes = c(3,4)) + scale_color_manual(values=c("#FFD86C", "#CCAA14", "#F18F49", "#E87200", "#CD4C46"))
+
+JustCytPCA$PC1 = ((PCA_on_ImputatedVals$svd$U)[,1])
+JustCytPCA$PC2 = ((PCA_on_ImputatedVals$svd$U)[,2])
+
+JustCytPCADMMsOnly = JustCytPCA %>% filter(!is.na(DMMClusterAssign))
+JustCytPCA = JustCytPCA %>% left_join(FullData %>% select(study_id, DMMClusterAssign), by="study_id") %>% left_join(ClinicalData %>% select(study_id, wound_type,inflame, woundloc,resting_pain_3cat,  woundage, woundcarepain, resting_pain), by="study_id")
+ggplot(JustCytPCA, aes(x=factor(DMMClusterAssign), y=PC1) ) + geom_boxplot() + ggpubr::stat_compare_means()
+ggplot(JustCytPCA, aes(x=factor(woundcarepain), y=PC1) ) + geom_boxplot() + ggpubr::stat_compare_means()
+ggplot(JustCytPCADMMsOnly, aes(x=factor(DMMClusterAssign), y=PC1) ) + geom_boxplot() + ggpubr::stat_compare_means()
+ggplot(JustCytPCA, aes(x=factor(woundcarepain), y=PC1) ) + geom_boxplot() + ggpubr::stat_compare_means()
+ggplot(JustCytPCA, aes(x=factor(woundloc), y=PC1) ) + geom_boxplot() + ggpubr::stat_compare_means()
+ggplot(JustCytPCA, aes(x=factor(woundage), y=PC1) ) + geom_boxplot() + ggpubr::stat_compare_means()
+ggplot(JustCytPCA, aes(x=factor(resting_pain_3cat), y=PC1) ) + geom_boxplot() + ggpubr::stat_compare_means()
+ggplot(JustCytPCA, aes(x=factor(inflame), y=PC2) ) + geom_boxplot() + ggpubr::stat_compare_means()
+
+
+InflammationVsMarkers = FullData %>% select(study_id, listCytokines) %>% left_join(ClinicalData %>% select(study_id, inflame), by="study_id")
+ 
+InflammationVsMarkers = InflammationVsMarkers %>% melt(id.vars=c("inflame", "study_id"))
+colnames(InflammationVsMarkers) = c("inflame", "study_id", "markergene", "value")
+InflammationVsMarkers$inflame = if_else(InflammationVsMarkers$inflame==1, "Inflamed", "NotInflamed")
+InflammationVsMarkers$Value = log2(InflammationVsMarkers$value)
+InflammationVsMarkers$Value
+InflammationStats = InflammationVsMarkers %>% group_by(markergene) %>% wilcox_test(Value ~ (inflame))  %>% adjust_pvalue(method = "BH") %>% add_significance()  %>%  add_xy_position(x="inflame")
+InflammationStats$p.adj = round(InflammationStats$p.adj, 5)
+ggplot(InflammationVsMarkers, aes(x=(inflame), y=Value, fill=markergene)) + geom_boxplot() + facet_grid(.~markergene) + stat_pvalue_manual(InflammationStats, label="p.adj") + xlab("Clinical Inflammation") + scale_fill_brewer()
+
