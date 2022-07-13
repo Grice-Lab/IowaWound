@@ -25,19 +25,10 @@ AddCLRDes = function(namestring){
 }
 
 WoundMicrobiome = read.csv("~/Documents/IowaWoundData2021/PlotsForSue2022/WoundMicrobiomeDataForSEG_AEC.csv")
-DominantGenera = read.csv("~/Documents/IowaWoundData2021/WoundAbundanceData_CLR_DominantGenera.csv")
 CytokineData = read.csv("~/Documents/IowaWoundData2021/PlotsForSue2022/MergedData_for_SK.csv")
 ClinicalData = read.csv("/Users/amycampbell/Documents/IowaWoundData2021/Qiime2Data/GSWOUNDGRICE2015_20190221.csv")
 
-
-DomGeneraCols = colnames(DominantGenera)
-
-DomGeneraCols = sapply(DomGeneraCols, AddCLRDes)
-
-colnames(DominantGenera) = DomGeneraCols
-
-
-
+WoundMicrobiome$study_id = sapply(WoundMicrobiome$StudyID, as.character)
 # Anything with technical mean CT > 35 = NA
 # delta CT is techMean - 18SMean
 ############################################
@@ -66,8 +57,7 @@ for(target in names(CytokineDataNonNAGr20)){
 }
 
 FullData = ClinicalDataAllIDs
-DominantGenera$study_id = as.character(DominantGenera$StudyID)
-FullData = FullData %>% left_join(DominantGenera, by="study_id")
+FullData = FullData %>% left_join(WoundMicrobiome, by="study_id")
 
 
 FullDataDataPresent = FullData %>% select(study_id, DMMClusterAssign,names(CytokineDataNonNAGr20) )
@@ -94,17 +84,62 @@ DataAvailablePlot$data$variable = factor(DataAvailablePlot$data$variable , level
 ggsave(DataAvailablePlot + theme(axis.text.x=element_blank()) + xlab("Patient") + ylab("Biological Variable"), file="~/Documents/IowaWoundData2021/PaperFigs/DataPresence.pdf", width=20, height=4)
 ggsave(DataAvailablePlot + xlab("Patient") + ylab("Biological Variable"), file="~/Documents/IowaWoundData2021/PaperFigs/DataPresencePatientIDs.pdf", width=20, height=4)
 
+FullData
 
-
-# Test for differences, visualize that way if we have something to show
-###############################################################################
+# Coding for binary comparison 
+###############################
 FullData = FullData %>% left_join(ClinicalData %>% select(study_id, woundcarepain))
-FullData = FullData %>% mutate(PainCatBinary = case_when( woundcarepain==0 | woundcarepain==1 | woundcarepain==2 ~"NoneMildModerate",
-                                                           woundcarepain==3~ "Severe", 
-                                                          ))
+FullData = FullData %>% mutate(PainCatBinary = case_when( woundcarepain==0 | woundcarepain==1  ~"NoneMild",
+                                                          woundcarepain==3~ "Severe", 
+                                                          woundcarepain==2 ~ "Moderate" 
+))
 
 
 FullData$PainCatBinary[FullData$PainCatBinary=="NA"] = NA
+FullData_TestSevereVsMildNone = FullData %>% filter(PainCatBinary != "Moderate")
+
+# Microbiome data alone
+########################
+#WoundMicrobiome$study_id = WoundMicrobiome$StudyID
+#WoundMicrobiomeForMerge = WoundMicrobiome %>% select(study_id, Genus_Richness, Genus_Shannon, colnames(WoundMicrobiome)[grepl(colnames(WoundMicrobiome),pattern= "_CLR")] )
+#WoundMicrobiomeForMerge$study_id = sapply(WoundMicrobiomeForMerge$study_id, as.character)
+#FullData = FullData %>% left_join(WoundMicrobiomeForMerge, by="study_id")
+
+
+AbundanceCLR = colnames(FullData)[grepl(colnames(FullData), pattern="_CLR")]
+FullData_TestSevereVsMildNoneCLRs = FullData %>% filter(PainCatBinary != "Moderate")
+AbundanceCLR
+pvallistGenus = c()
+for(genus in AbundanceCLR){
+  wiltest = (wilcox.test(FullData_TestSevereVsMildNoneCLRs[,genus] ~ FullData_TestSevereVsMildNoneCLRs[, "PainCatBinary"]))
+
+  pvallistGenus=append(pvallistGenus,  wiltest$p.value)
+}
+
+GenusAbundances= data.frame(Genus=AbundanceCLR, wilcox_p = pvallistGenus)
+GenusAbundances$PAdj = p.adjust(GenusAbundances$wilcox_p, method="BH")
+
+FullData_TestSevereVsMildNoneCLRs$PainCatBinary = factor(FullData_TestSevereVsMildNoneCLRs$PainCatBinary)
+
+
+
+DataMeltedGenusAbundance = FullData_TestSevereVsMildNoneCLRs %>% select(AbundanceCLR, PainCatBinary) %>% melt(id.vars=c("PainCatBinary"))
+
+GenusStats = DataMeltedGenusAbundance %>% group_by(Genus) %>% wilcox_test(value ~ PainCatBinary)  %>% adjust_pvalue(method = "BH") %>% add_significance()  %>%  add_xy_position(x="PainCatBinary")
+GenusStats$y.position = GenusStats$y.position + 1
+DataMeltedGenusAbundance$Genus = sapply(DataMeltedGenusAbundance$variable, function(x) str_split(x,pattern="Abundance_CLR")[[1]][1])
+ggplot(DataMeltedGenusAbundance, aes(x=PainCatBinary, y=value, fill=Genus)) + geom_boxplot(alpha=.4) + facet_grid(~ Genus) + scale_fill_brewer(palette ="Dark2" ) + geom_jitter(width=.2) + theme_classic() + ggpubr::stat_pvalue_manual(GenusStats, label="p.adj") + ylim(0, 14) + xlab("Pain Rating Category") + ggtitle("Common Genus Abundance in Wounds with \nSevere vs. None/Mild Pain Ratings") + theme(plot.title=element_text(hjust=.5, size=15, face="bold")) + ylab("CLR-transformed relative abundance") 
+
+
+# DMM variables + healing
+#########################
+TwoWay = FullData_TestSevereVsMildNoneCLRs %>% select(DMMClusterAssign, PainCatBinary) %>% na.omit()
+TwoWay$PainCatBinary = factor(TwoWay$PainCatBinary)
+TwoWay$DMMClusterAssign = factor(TwoWay$DMMClusterAssign)
+chisq.test(table(TwoWay))
+
+# Cytokine data alone
+#######################
 
 listCytokines = c("ARG1-Hs00163660_m1",  "C3-Hs00163811_m1",  "C5AR1-Hs00704891_s1", "CAMP-Hs00189038_m1",  "CXCL8-Hs00174103_m1", "IL1A-Hs00174092_m1",  "IL1B-Hs01555410_m1",
 "IL6-Hs00174131_m1", "LCN2-Hs01008571_m1", "MMP1-Hs00899658_m1", "MMP2-Hs01548727_m1", "MMP9-Hs00957562_m1", "TNF-Hs00174128_m1")
@@ -112,17 +147,21 @@ listCytokines = c("ARG1-Hs00163660_m1",  "C3-Hs00163811_m1",  "C5AR1-Hs00704891_
 
 
 
+FullData_TestSevereVsMildNone$Nmissing = rowSums(is.na(FullData_TestSevereVsMildNone %>% select(listCytokines)))
+dim(FullData_TestSevereVsMildNone %>% filter(Nmissing < 13))
 listPvalues = c()
 listcytokinesTested = c()
 listPvaluesNoneVsSevere = c()
 for(cyt in listCytokines){
-  testresult = (wilcox.test(FullData[,cyt] ~ FullData[,"PainCatBinary"]))
+  testresult = (wilcox.test(log2(FullData_TestSevereVsMildNone[,cyt]) ~ FullData_TestSevereVsMildNone[,"PainCatBinary"]))
   listcytokinesTested = c(listcytokinesTested, cyt)
   listPvalues = c(listPvalues, testresult$p.value)
   
 }
 
 
+# Cytokines vs. Microbiome data
+###############################
 listkruskalCytokinesDMM = c()
 listkruskalPs = c()
 for(cyt in listCytokines){
@@ -132,8 +171,6 @@ for(cyt in listCytokines){
   
 }
 
-# Cytokines with significant KW p values adjusted
-##################################################
 for(cyt in listCytokines){
   if(cyt %in% c("C5AR1-Hs00704891_s1","CXCL8-Hs00174103_m1", "IL1B-Hs01555410_m1", "MMP2-Hs01548727_m1")){
     
