@@ -124,12 +124,15 @@ FullData_TestSevereVsMildNoneCLRs$PainCatBinary = factor(FullData_TestSevereVsMi
 
 
 DataMeltedGenusAbundance = FullData_TestSevereVsMildNoneCLRs %>% select(AbundanceCLR, PainCatBinary) %>% melt(id.vars=c("PainCatBinary"))
+DataMeltedGenusAbundance$Genus = sapply(DataMeltedGenusAbundance$variable, function(x) str_split(x,pattern="Abundance_CLR")[[1]][1])
 
 GenusStats = DataMeltedGenusAbundance %>% group_by(Genus) %>% wilcox_test(value ~ PainCatBinary)  %>% adjust_pvalue(method = "BH") %>% add_significance()  %>%  add_xy_position(x="PainCatBinary")
 GenusStats$y.position = GenusStats$y.position + 1
-DataMeltedGenusAbundance$Genus = sapply(DataMeltedGenusAbundance$variable, function(x) str_split(x,pattern="Abundance_CLR")[[1]][1])
-ggplot(DataMeltedGenusAbundance, aes(x=PainCatBinary, y=value, fill=Genus)) + geom_boxplot(alpha=.4) + facet_grid(~ Genus) + scale_fill_brewer(palette ="Dark2" ) + geom_jitter(width=.2) + theme_classic() + ggpubr::stat_pvalue_manual(GenusStats, label="p.adj") + ylim(0, 14) + xlab("Pain Rating Category") + ggtitle("Common Genus Abundance in Wounds with \nSevere vs. None/Mild Pain Ratings") + theme(plot.title=element_text(hjust=.5, size=15, face="bold")) + ylab("CLR-transformed relative abundance") 
-
+GenusPainPlot = ggplot(DataMeltedGenusAbundance, aes(x=PainCatBinary, y=value, fill=Genus)) + geom_boxplot(alpha=.4) + facet_grid(~ Genus) +
+  scale_fill_brewer(palette ="Dark2" ) + geom_jitter(width=.2) + theme_classic() + ggpubr::stat_pvalue_manual(GenusStats, label="p.adj") +
+  ylim(0, 14) + xlab("Pain Rating Category") + ggtitle("Common Genus Abundance in Wounds with \nSevere vs. None/Mild Pain Ratings") +
+  theme(plot.title=element_text(hjust=.5, size=18, face="bold"), axis.text.x=element_text(size=11),strip.text.x=element_text(size=13), axis.title.x=element_text(size=14), axis.title.y=element_text(size=14), legend.position="None") + ylab("CLR-transformed relative abundance") 
+ggsave(GenusPainPlot, file="~/Documents/IowaWoundData2021/PaperFigs/GenusPain.pdf", width=10, height=7)
 
 # DMM variables + healing
 #########################
@@ -147,16 +150,18 @@ listCytokines = c("ARG1-Hs00163660_m1",  "C3-Hs00163811_m1",  "C5AR1-Hs00704891_
 
 
 
-FullData_TestSevereVsMildNone$Nmissing = rowSums(is.na(FullData_TestSevereVsMildNone %>% select(listCytokines)))
+FullData_TestSevereVsMildNone$Nmissing = rowSums(is.na(FullData_TestSevereVsMildNone %>% select(all_of(listCytokines))))
 dim(FullData_TestSevereVsMildNone %>% filter(Nmissing < 13))
 listPvalues = c()
 listcytokinesTested = c()
 listPvaluesNoneVsSevere = c()
+kruskal_ps = c()
 for(cyt in listCytokines){
   testresult = (wilcox.test(log2(FullData_TestSevereVsMildNone[,cyt]) ~ FullData_TestSevereVsMildNone[,"PainCatBinary"]))
   listcytokinesTested = c(listcytokinesTested, cyt)
   listPvalues = c(listPvalues, testresult$p.value)
-  
+  kruskal_all = kruskal.test(FullData[, cyt] ~ FullData[, "woundcarepain"])
+  kruskal_ps =append(kruskal_ps, kruskal_all$p.value)
 }
 
 
@@ -180,9 +185,17 @@ for(cyt in listCytokines){
 }
 
 
+FourCyts = FullData %>% select(c("C5AR1-Hs00704891_s1","CXCL8-Hs00174103_m1", "IL1B-Hs01555410_m1", "MMP2-Hs01548727_m1"))
+GenusVars = FullData %>% select(AbundanceCLR)
+FourCyts = apply(FourCyts, 2, function(x) log2(x))
+DFCompare = cbind(FourCyts,GenusVars )
+pairs(DFCompare)
 
-DataFrameCytokinePain = data.frame(pvals = listPvalues, Cytokine=listcytokinesTested)
+
+
+DataFrameCytokinePain = data.frame(pvals = listPvalues, Cytokine=listcytokinesTested, kruskalp = kruskal_ps)
 DataFrameCytokinePain$PAdjust = p.adjust(DataFrameCytokinePain$pvals, method="BH")
+DataFrameCytokinePain$PAdjustKruskal = p.adjust(DataFrameCytokinePain$kruskalp, method="BH")
 
 
 
@@ -200,16 +213,17 @@ CytokineDataBySample = CytokineDataBySample %>% left_join(numCytokines %>% selec
 CytokineDataBySample_RemoveZeroCytokine = CytokineDataBySample %>% filter(Ncyt > 0 )
 MeltCytokineDataBySample = CytokineDataBySample_RemoveZeroCytokine %>% reshape2::melt(id.vars=(c("woundcarepain", "DMMClusterAssign", "PainCatBinary", "study_id", "Ncyt")))
 
-orderHeatMap = unique((CytokineDataBySample %>% arrange(DMMClusterAssign, Ncyt))$study_id)
-orderHeatMap = unique((CytokineDataBySample %>% arrange(woundcarepain, Ncyt))$study_id)
+orderHeatMapDMM = ((CytokineDataBySample %>% arrange(DMMClusterAssign, Ncyt))$study_id)
+orderHeatMap = ((CytokineDataBySample %>% arrange(woundcarepain, Ncyt))$study_id)
 
 CytokineBySubjectPlot = ggplot(MeltCytokineDataBySample, aes(x=study_id, y=variable, fill=log2(value))) + geom_tile() + scale_fill_viridis(option="plasma", na.value="white")
 CytokineBySubjectPlot$data$study_id = factor(CytokineBySubjectPlot$data$study_id, levels=orderHeatMap)
 CytokineBySubjectPlot$data$variable = factor(CytokineBySubjectPlot$data$variable, levels=names(rev(sort(CytokineDataNonNAGr20))))
 
-CytokineBySubjectPlot + theme_classic() + theme(axis.text.x=element_text(angle=70, hjust=.5, vjust=.5))
+CytokineBySubjectPlot = CytokineBySubjectPlot + theme_classic() + theme(axis.text.x=element_text(angle=90, hjust=.5, vjust=.5), axis.text.y=element_text(size=10), plot.title=element_text(face="bold", size=18, hjust=.5)) + ggtitle("Inflammatory Gene Expression by Patient (-∆CT)") + labs(fill="-∆CT")
 
-
+ggsave(CytokineBySubjectPlot, file="~/Documents/IowaWoundData2021/PaperFigs/InflamVsPatient.png",width=20, height=10)
+ggsave(CytokineBySubjectPlot, file="~/Documents/IowaWoundData2021/PaperFigs/InflamVsPatient.pdf",width=20, height=10)
 
 # DMM vs. markers
 # "C5AR1-Hs00704891_s1","CXCL8-Hs00174103_m1", "IL1B-Hs01555410_m1", "MMP2-Hs01548727_m1"
