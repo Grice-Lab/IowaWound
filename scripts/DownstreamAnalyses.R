@@ -8,9 +8,9 @@ library("ggpubr")
 library("reshape2")
 library("viridis")
 library("gplots")
-library("rstatix")
 
 # Imputed PCA functions
+library("rstatix")
 library("missMDA")
 library("FactoMineR")
 
@@ -84,7 +84,6 @@ DataAvailablePlot$data$variable = factor(DataAvailablePlot$data$variable , level
 ggsave(DataAvailablePlot + theme(axis.text.x=element_blank()) + xlab("Patient") + ylab("Biological Variable"), file="~/Documents/IowaWoundData2021/PaperFigs/DataPresence.pdf", width=20, height=4)
 ggsave(DataAvailablePlot + xlab("Patient") + ylab("Biological Variable"), file="~/Documents/IowaWoundData2021/PaperFigs/DataPresencePatientIDs.pdf", width=20, height=4)
 
-FullData
 
 # Coding for binary comparison 
 ###############################
@@ -100,10 +99,6 @@ FullData_TestSevereVsMildNone = FullData %>% filter(PainCatBinary != "Moderate")
 
 # Microbiome data alone
 ########################
-#WoundMicrobiome$study_id = WoundMicrobiome$StudyID
-#WoundMicrobiomeForMerge = WoundMicrobiome %>% select(study_id, Genus_Richness, Genus_Shannon, colnames(WoundMicrobiome)[grepl(colnames(WoundMicrobiome),pattern= "_CLR")] )
-#WoundMicrobiomeForMerge$study_id = sapply(WoundMicrobiomeForMerge$study_id, as.character)
-#FullData = FullData %>% left_join(WoundMicrobiomeForMerge, by="study_id")
 
 
 AbundanceCLR = colnames(FullData)[grepl(colnames(FullData), pattern="_CLR")]
@@ -133,6 +128,19 @@ GenusPainPlot = ggplot(DataMeltedGenusAbundance, aes(x=PainCatBinary, y=value, f
   ylim(0, 14) + xlab("Pain Rating Category") + ggtitle("Common Genus Abundance in Wounds with \nSevere vs. None/Mild Pain Ratings") +
   theme(plot.title=element_text(hjust=.5, size=18, face="bold"), axis.text.x=element_text(size=11),strip.text.x=element_text(size=13), axis.title.x=element_text(size=14), axis.title.y=element_text(size=14), legend.position="None") + ylab("CLR-transformed relative abundance") 
 ggsave(GenusPainPlot, file="~/Documents/IowaWoundData2021/PaperFigs/GenusPain.pdf", width=10, height=7)
+
+ClinicalData
+
+
+DataMeltedGenusAbundanceInflammation = FullData %>% select(AbundanceCLR, I) %>% melt(id.vars=c("PainCatBinary"))
+DataMeltedGenusAbundance$Genus = sapply(DataMeltedGenusAbundance$variable, function(x) str_split(x,pattern="Abundance_CLR")[[1]][1])
+
+GenusInflammationPlot = ggplot(DataMeltedGenusAbundance, aes(x=inflame, y=value, fill=Genus)) + geom_boxplot(alpha=.4) + facet_grid(~ Genus) +
+  scale_fill_brewer(palette ="Dark2" ) + geom_jitter(width=.2) + theme_classic() + ggpubr::stat_pvalue_manual(GenusStats, label="p.adj") +
+  ylim(0, 14) + xlab("Pain Rating Category") + ggtitle("Common Genus Abundance in Wounds with \nSevere vs. None/Mild Pain Ratings") +
+  theme(plot.title=element_text(hjust=.5, size=18, face="bold"), axis.text.x=element_text(size=11),strip.text.x=element_text(size=13), axis.title.x=element_text(size=14), axis.title.y=element_text(size=14), legend.position="None") + ylab("CLR-transformed relative abundance") 
+ggsave(GenusPainPlot, file="~/Documents/IowaWoundData2021/PaperFigs/GenusPain.pdf", width=10, height=7)
+
 
 # DMM variables + healing
 #########################
@@ -197,8 +205,6 @@ DataFrameCytokinePain = data.frame(pvals = listPvalues, Cytokine=listcytokinesTe
 DataFrameCytokinePain$PAdjust = p.adjust(DataFrameCytokinePain$pvals, method="BH")
 DataFrameCytokinePain$PAdjustKruskal = p.adjust(DataFrameCytokinePain$kruskalp, method="BH")
 
-
-
 DataFrameCytokineDMMs = data.frame(pvalsKruskalWallis =listkruskalPs, Cytokine=listkruskalCytokinesDMM )
 DataFrameCytokineDMMs$PAdjustKW = p.adjust(DataFrameCytokineDMMs$pvalsKruskalWallis, method="BH")
 
@@ -224,6 +230,19 @@ CytokineBySubjectPlot = CytokineBySubjectPlot + theme_classic() + theme(axis.tex
 
 ggsave(CytokineBySubjectPlot, file="~/Documents/IowaWoundData2021/PaperFigs/InflamVsPatient.png",width=20, height=10)
 ggsave(CytokineBySubjectPlot, file="~/Documents/IowaWoundData2021/PaperFigs/InflamVsPatient.pdf",width=20, height=10)
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 # DMM vs. markers
 # "C5AR1-Hs00704891_s1","CXCL8-Hs00174103_m1", "IL1B-Hs01555410_m1", "MMP2-Hs01548727_m1"
@@ -274,48 +293,48 @@ CorrHeatMap$data$Var2 = factor(CorrHeatMap$data$Var2, levels=(Hclustering$labels
 
 
 
-# PCA with missing values on the cytokines
-############################################
-dim(JustCyt)
-dim(FullData)
-2^(-5.928095e-06 )
-
-JustCytPCA = FullData %>% select(listCytokines, study_id)
-JustCytPCA[,1:(ncol(JustCytPCA) - 1)] <- log2(JustCytPCA[,1:(ncol(JustCytPCA) - 1)])
-
-JustCytPCA$NumMissing = rowSums(is.na(JustCytPCA))
-
-JustCytPCA = JustCytPCA %>% filter(NumMissing < 7)
-
-JustCytPCASubset = JustCytPCA %>% select(-NumMissing, -study_id)
-
-ncompEst <- estim_ncpPCA(JustCytPCASubset,method.cv = "Kfold", verbose = FALSE) 
-plot(0:5, ncompEst$criterion, xlab = "nb dim", ylab = "MSEP")
-ImputedCytokinePCA = imputePCA(JustCytPCASubset, ncp = ncompEst$ncp)
-dim(ImputedCytokinePCA$completeObs)
-ImputedCytokinePCA = cbind(ImputedCytokinePCA$completeObs, JustCytPCA %>% select(study_id))
-ImputedCytokinePCA$study_id = factor(ImputedCytokinePCA$study_id)
-ImputedCytokinePCA = ImputedCytokinePCA %>% left_join(ClinicalData %>% select(study_id, wound_type,woundage,woundloc ), by="study_id") %>% select(-study_id, -woundloc,-wound_type)
-ImputedCytokinePCA$woundage = sapply(ImputedCytokinePCA$woundage, function(x) as.character(x))
-dim(ImputedCytokinePCA)
-PCA_on_ImputatedVals <- PCA(ImputedCytokinePCA, quali.sup = 14, ncp = ncompEst$ncp, graph=FALSE)
-PCA_on_ImputatedVals$var
-PCA_on_ImputatedVals$quali.sup
-plot(PCA_on_ImputatedVals, lab="none", habillage = 14, axes = c(3,4)) + scale_color_manual(values=c("#FFD86C", "#CCAA14", "#F18F49", "#E87200", "#CD4C46"))
-
-JustCytPCA$PC1 = ((PCA_on_ImputatedVals$svd$U)[,1])
-JustCytPCA$PC2 = ((PCA_on_ImputatedVals$svd$U)[,2])
-
-JustCytPCADMMsOnly = JustCytPCA %>% filter(!is.na(DMMClusterAssign))
-JustCytPCA = JustCytPCA %>% left_join(FullData %>% select(study_id, DMMClusterAssign), by="study_id") %>% left_join(ClinicalData %>% select(study_id, wound_type,inflame, woundloc,resting_pain_3cat,  woundage, woundcarepain, resting_pain), by="study_id")
-ggplot(JustCytPCA, aes(x=factor(DMMClusterAssign), y=PC1) ) + geom_boxplot() + ggpubr::stat_compare_means()
-ggplot(JustCytPCA, aes(x=factor(woundcarepain), y=PC1) ) + geom_boxplot() + ggpubr::stat_compare_means()
-ggplot(JustCytPCADMMsOnly, aes(x=factor(DMMClusterAssign), y=PC1) ) + geom_boxplot() + ggpubr::stat_compare_means()
-ggplot(JustCytPCA, aes(x=factor(woundcarepain), y=PC1) ) + geom_boxplot() + ggpubr::stat_compare_means()
-ggplot(JustCytPCA, aes(x=factor(woundloc), y=PC1) ) + geom_boxplot() + ggpubr::stat_compare_means()
-ggplot(JustCytPCA, aes(x=factor(woundage), y=PC1) ) + geom_boxplot() + ggpubr::stat_compare_means()
-ggplot(JustCytPCA, aes(x=factor(resting_pain_3cat), y=PC1) ) + geom_boxplot() + ggpubr::stat_compare_means()
-ggplot(JustCytPCA, aes(x=factor(inflame), y=PC2) ) + geom_boxplot() + ggpubr::stat_compare_means()
+# # PCA with missing values on the cytokines
+# ############################################
+# dim(JustCyt)
+# dim(FullData)
+# 2^(-5.928095e-06 )
+# 
+# JustCytPCA = FullData %>% select(listCytokines, study_id)
+# JustCytPCA[,1:(ncol(JustCytPCA) - 1)] <- log2(JustCytPCA[,1:(ncol(JustCytPCA) - 1)])
+# 
+# JustCytPCA$NumMissing = rowSums(is.na(JustCytPCA))
+# 
+# JustCytPCA = JustCytPCA %>% filter(NumMissing < 7)
+# 
+# JustCytPCASubset = JustCytPCA %>% select(-NumMissing, -study_id)
+# 
+# ncompEst <- estim_ncpPCA(JustCytPCASubset,method.cv = "Kfold", verbose = FALSE) 
+# plot(0:5, ncompEst$criterion, xlab = "nb dim", ylab = "MSEP")
+# ImputedCytokinePCA = imputePCA(JustCytPCASubset, ncp = ncompEst$ncp)
+# dim(ImputedCytokinePCA$completeObs)
+# ImputedCytokinePCA = cbind(ImputedCytokinePCA$completeObs, JustCytPCA %>% select(study_id))
+# ImputedCytokinePCA$study_id = factor(ImputedCytokinePCA$study_id)
+# ImputedCytokinePCA = ImputedCytokinePCA %>% left_join(ClinicalData %>% select(study_id, wound_type,woundage,woundloc ), by="study_id") %>% select(-study_id, -woundloc,-wound_type)
+# ImputedCytokinePCA$woundage = sapply(ImputedCytokinePCA$woundage, function(x) as.character(x))
+# dim(ImputedCytokinePCA)
+# PCA_on_ImputatedVals <- PCA(ImputedCytokinePCA, quali.sup = 14, ncp = ncompEst$ncp, graph=FALSE)
+# PCA_on_ImputatedVals$var
+# PCA_on_ImputatedVals$quali.sup
+# plot(PCA_on_ImputatedVals, lab="none", habillage = 14, axes = c(3,4)) + scale_color_manual(values=c("#FFD86C", "#CCAA14", "#F18F49", "#E87200", "#CD4C46"))
+# 
+# JustCytPCA$PC1 = ((PCA_on_ImputatedVals$svd$U)[,1])
+# JustCytPCA$PC2 = ((PCA_on_ImputatedVals$svd$U)[,2])
+# 
+# JustCytPCADMMsOnly = JustCytPCA %>% filter(!is.na(DMMClusterAssign))
+# JustCytPCA = JustCytPCA %>% left_join(FullData %>% select(study_id, DMMClusterAssign), by="study_id") %>% left_join(ClinicalData %>% select(study_id, wound_type,inflame, woundloc,resting_pain_3cat,  woundage, woundcarepain, resting_pain), by="study_id")
+# ggplot(JustCytPCA, aes(x=factor(DMMClusterAssign), y=PC1) ) + geom_boxplot() + ggpubr::stat_compare_means()
+# ggplot(JustCytPCA, aes(x=factor(woundcarepain), y=PC1) ) + geom_boxplot() + ggpubr::stat_compare_means()
+# ggplot(JustCytPCADMMsOnly, aes(x=factor(DMMClusterAssign), y=PC1) ) + geom_boxplot() + ggpubr::stat_compare_means()
+# ggplot(JustCytPCA, aes(x=factor(woundcarepain), y=PC1) ) + geom_boxplot() + ggpubr::stat_compare_means()
+# ggplot(JustCytPCA, aes(x=factor(woundloc), y=PC1) ) + geom_boxplot() + ggpubr::stat_compare_means()
+# ggplot(JustCytPCA, aes(x=factor(woundage), y=PC1) ) + geom_boxplot() + ggpubr::stat_compare_means()
+# ggplot(JustCytPCA, aes(x=factor(resting_pain_3cat), y=PC1) ) + geom_boxplot() + ggpubr::stat_compare_means()
+# ggplot(JustCytPCA, aes(x=factor(inflame), y=PC2) ) + geom_boxplot() + ggpubr::stat_compare_means()
 
 
 InflammationVsMarkers = FullData %>% select(study_id, listCytokines) %>% left_join(ClinicalData %>% select(study_id, inflame), by="study_id")
