@@ -53,7 +53,22 @@ PainRatings = PainRatings %>% select(woundcarepain, OrdinalResting)
 PainRatings$woundcarepain = factor(PainRatings$woundcarepain)
 PainRatings$OrdinalResting = factor(PainRatings$OrdinalResting)
 
-correlation::cor_test(PainRatings,"woundcarepain", "OrdinalResting",method="polychoric")
+WCP_rest_cor = correlation::cor_test(PainRatings,"woundcarepain", "OrdinalResting",method="polychoric")
+
+TablePainCareResting = table(PainRatings)
+chisq.test(TablePainCareResting)
+rownames(TablePainCareResting) = c("None", "Mild", "Moderate","Severe")
+colnames(TablePainCareResting) = c("None", "Mild", "Moderate","Severe")
+write.csv(TablePainCareResting, file="~/Documents/IowaWoundData2021/PainTypesRelationshipWhole.csv")
+
+
+TablePainCareResting[,1] = TablePainCareResting[,1]/sum(TablePainCareResting[,1])
+TablePainCareResting[,2] = TablePainCareResting[,2]/sum(TablePainCareResting[,2])
+TablePainCareResting[,3] = TablePainCareResting[,3]/sum(TablePainCareResting[,3])
+TablePainCareResting[,4] = TablePainCareResting[,4]/sum(TablePainCareResting[,4])
+
+write.csv(TablePainCareResting, file="~/Documents/IowaWoundData2021/PainTypesRelationshipFreq.csv")
+
 
 
 # Anything with technical mean CT > 35 = NA
@@ -210,6 +225,20 @@ TwoWay$PainCatBinary = factor(TwoWay$PainCatBinary)
 TwoWay$DMMClusterAssign = factor(TwoWay$DMMClusterAssign)
 chisq.test(table(TwoWay))
 
+TwoWayAllCats = FullData_WoundCarePain %>% select(DMMClusterAssign, woundcarepain) %>% na.omit()
+chisq.test(table(TwoWayAllCats))
+
+TwoWayAllCatsTable = table(TwoWayAllCats)
+
+write.csv(TwoWayAllCatsTable, file="~/Documents/IowaWoundData2021/PainDMMWhole.csv")
+
+TwoWayAllCatsTable[,1] = round(TwoWayAllCatsTable[,1]/sum(TwoWayAllCatsTable[,1]), 3)
+TwoWayAllCatsTable[,2] = round(TwoWayAllCatsTable[,2]/sum(TwoWayAllCatsTable[,2]),3)
+TwoWayAllCatsTable[,3] = round(TwoWayAllCatsTable[,3]/sum(TwoWayAllCatsTable[,3]),3)
+TwoWayAllCatsTable[,4] = round(TwoWayAllCatsTable[,4]/sum(TwoWayAllCatsTable[,4]),3)
+write.csv(TwoWayAllCatsTable, file="~/Documents/IowaWoundData2021/PainDMMFreq.csv")
+
+
 # Chi-Sq for proportion of each DMM in each resting pain category (binary)
 ##########################################################################
 TwoWayResting =  FullDataWithRestingNoMods %>% select(DMMClusterAssign, RestingBinary) %>% na.omit()
@@ -217,6 +246,16 @@ chisq.test(table(TwoWayResting))
 TwoWayRestingCat=  FullDataWithRestingNoMods %>% select(DMMClusterAssign, resting_pain_cat) %>% na.omit()
 chisq.test(table(TwoWayRestingCat) )
 
+TwoWayRestingAll = FullDataWithResting %>% select(DMMClusterAssign, resting_pain_cat) %>% na.omit()
+TwoWayRestingAll = table(TwoWayRestingAll)
+
+write.csv(TwoWayRestingAll, file="~/Documents/IowaWoundData2021/RestingPainDMMWhole.csv")
+
+TwoWayRestingAll[,1] = round(TwoWayRestingAll[,1]/sum(TwoWayRestingAll[,1]), 3)
+TwoWayRestingAll[,2] = round(TwoWayRestingAll[,2]/sum(TwoWayRestingAll[,2]),3)
+TwoWayRestingAll[,3] = round(TwoWayRestingAll[,3]/sum(TwoWayRestingAll[,3]),3)
+TwoWayRestingAll[,4] = round(TwoWayRestingAll[,4]/sum(TwoWayRestingAll[,4]),3)
+write.csv(TwoWayRestingAll, file="~/Documents/IowaWoundData2021/RestingPainDMMFreq.csv")
 
 
 # Wilcox for shannon and richness-based diversity metrics for severe vs. none/mild wound care pain
@@ -263,6 +302,7 @@ DataFrameCytokinePain = data.frame(pvals = listPvalues, Cytokine=listcytokinesTe
 DataFrameCytokinePain$PAdjust = p.adjust(DataFrameCytokinePain$pvals, method="BH")
 DataFrameCytokinePain$PAdjustKruskal = p.adjust(DataFrameCytokinePain$kruskalp, method="BH")
 
+DataFrameCytokinePainJustWilcox = DataFrameCytokinePain %>% select(pvals, Cytokine, PAdjust)
 # Resting pain 
 ##############
 
@@ -293,7 +333,49 @@ DataFrameCytokinePain$pval_Resting = listPvaluesRest
 # no wilcoxon tests yielded relationships between wound care pain, cytokines or resting pain, cytokines
 
 
+# Visualizing Wound care pain vs. cytokines
+#############################################
+FullDataPain = FullData %>% left_join(ClinicalData %>% select(woundcarepain, study_id))
+FullDataPain  = FullDataPain %>% mutate(PainCatBinary = case_when(woundcarepain %in% c(0,1) ~ "NoneMild",
+                                       woundcarepain==2 ~ "Moderate", 
+                                       woundcarepain==3 ~ "Severe"))
 
+CytokineDataBySample = FullDataPain %>% select(listCytokines, study_id, PainCatBinary, DMMClusterAssign, woundcarepain)
+
+
+numCytokines = FullDataDataPresent %>% select(-woundcarepain,-DMMClusterAssign ) 
+numCytokines$Ncyt = rowSums(numCytokines[2: (ncol(numCytokines) - 1) ])
+CytokineDataBySample = CytokineDataBySample %>% left_join(numCytokines %>% select(study_id, Ncyt),  by ="study_id")
+
+CytokineDataBySample_RemoveZeroCytokine = CytokineDataBySample %>% filter(Ncyt > 0 )
+
+MeltCytokineDataBySample = CytokineDataBySample_RemoveZeroCytokine %>% reshape2::melt(id.vars=(c("woundcarepain", "DMMClusterAssign", "PainCatBinary", "study_id", "Ncyt")))
+
+
+
+orderHeatMapDMM = ((CytokineDataBySample %>% arrange(DMMClusterAssign, Ncyt))$study_id)
+orderHeatMap = ((CytokineDataBySample %>% arrange(woundcarepain, Ncyt))$study_id)
+
+
+names(CytokineDataNonNAGr20) = sapply(names(CytokineDataNonNAGr20), function(x) str_split(x, pattern="-")[[1]][1])
+MeltCytokineDataBySample$cytokine = sapply(MeltCytokineDataBySample$variable, function(x) str_split(x, pattern="-")[[1]][1])
+CytokineBySubjectPlot = ggplot(MeltCytokineDataBySample, aes(x=study_id, y=cytokine, fill=(value))) + geom_tile() + scale_fill_viridis(option="plasma", na.value="white")
+CytokineBySubjectPlot$data$study_id = factor(CytokineBySubjectPlot$data$study_id, levels=orderHeatMap)
+
+CytokineDataNonNAGr20 = sapply(CytokineDataNonNAGr20, function(x) as.numeric(as.character(x)))
+CytokineBySubjectPlot$data$cytokine = factor(CytokineBySubjectPlot$data$cytokine, levels=names(rev(sort(CytokineDataNonNAGr20))))
+CytokineBySubjectPlot = CytokineBySubjectPlot + theme_classic() + theme(axis.text.x=element_text(angle=90, hjust=.5, vjust=.5), axis.text.y=element_text(size=10), plot.title=element_text(face="bold", size=18, hjust=.5)) + ggtitle("Inflammatory Gene Expression by Patient (-∆CT)") + labs(fill="-∆CT")
+
+ggsave(CytokineBySubjectPlot, file="~/Documents/IowaWoundData2021/PaperFigs/InflamVsPatient.png",width=20, height=10)
+ggsave(CytokineBySubjectPlot, file="~/Documents/IowaWoundData2021/PaperFigs/InflamVsPatient.pdf",width=20, height=10)
+
+DataFrameCytokinePainJustWilcox = DataFrameCytokinePainJustWilcox %>% select(Cytokine, pvals, PAdjust)
+row.names(DataFrameCytokinePainJustWilcox) = sapply(DataFrameCytokinePainJustWilcox$Cytokine, function(x) str_split(x, pattern="-")[[1]][1])
+
+DataFrameCytokinePainJustWilcox = DataFrameCytokinePainJustWilcox[names(rev(sort(CytokineDataNonNAGr20))),]
+DataFrameCytokinePainJustWilcox$pvals = round(DataFrameCytokinePainJustWilcox$pvals, 3)
+DataFrameCytokinePainJustWilcox$PAdjust = round(DataFrameCytokinePainJustWilcox$PAdjust, 3)
+write.csv(DataFrameCytokinePainJustWilcox, file="~/Documents/IowaWoundData2021/CytokinesVsHealing.csv")
 ############################################
 # (2) BIOLOGICAL VARIABLES  VS. INFLAMMATION 
 #############################################
@@ -323,8 +405,17 @@ ggsave(GenusInflammationPlot, file="~/Documents/IowaWoundData2021/PaperFigs/Genu
 
 # Testing relationship between DMM Assignment, inflammation
 ############################################################
-TwoWayInflameCluster = FullDataWithOtherClinicalsInflame %>% select(DMMClusterAssign, inflame)
+TwoWayInflameCluster = FullDataWithOtherClinicalsInflame %>% select(DMMClusterAssign, inflame) %>% na.omit()
 chisq.test(table(TwoWayInflameCluster))
+TwoWayInflameCluster = table(TwoWayInflameCluster)
+TwoWayInflameCluster
+write.csv(TwoWayInflameCluster, file="~/Documents/IowaWoundData2021/InflameDMMWhole.csv")
+
+
+TwoWayInflameCluster[,1] = round(TwoWayInflameCluster[,1] /sum(TwoWayInflameCluster[,1]),3)
+TwoWayInflameCluster[,2] = round(TwoWayInflameCluster[,2] /sum(TwoWayInflameCluster[,2]),3)
+write.csv(TwoWayInflameCluster, file="~/Documents/IowaWoundData2021/InflameDMMFreq.csv")
+
 
 
 # Now, cytokines vs. inflammation
@@ -397,21 +488,38 @@ wilcox.test(FullDataWithOtherClinicalDiversityAge$Genus_Shannon ~ FullDataWithOt
 wilcox.test(FullDataWithOtherClinicalDiversityAge$Genus_Richness ~ FullDataWithOtherClinicalDiversityAge$woundage)
 
 
-TwoWayAgeCluster = FullDataAge %>% select(DMMClusterAssign, woundage)
+TwoWayAgeCluster = FullDataAge %>% select(DMMClusterAssign, woundage) %>% na.omit()
 TwoWayAgeCluster$woundage = if_else(TwoWayAgeCluster$woundage %in% c(1, 2), "Acute", "Chronic")
 chisq.test(table(TwoWayAgeCluster) )
+write.csv(table(TwoWayAgeCluster), file="~/Documents/IowaWoundData2021/DMM_Age_whole.csv")
+
+TwoWayAgeCluster = table(TwoWayAgeCluster)
+
+TwoWayAgeCluster[,1] = round(TwoWayAgeCluster[,1]/sum(TwoWayAgeCluster[,1]), 3)
+TwoWayAgeCluster[,2] = round(TwoWayAgeCluster[,2]/sum(TwoWayAgeCluster[,2]), 3)
+write.csv((TwoWayAgeCluster), file="~/Documents/IowaWoundData2021/DMM_Age_freq.csv")
+
 
 FullDataAge = FullDataAge %>% mutate(PainCatBinary = case_when( woundcarepain==0 | woundcarepain==1  ~"NoneMild",
                                                                 woundcarepain==3~ "Severe", 
                                                                 woundcarepain==2 ~ "Moderate" ))
+
+
+
+
+
+
 AgeVsPain  = FullDataAge %>% select(PainCatBinary, woundage)
 AgeVsPain$woundage = if_else(AgeVsPain$woundage %in% c(1, 2), "Acute", "Chronic")
 AgeVsPain = AgeVsPain %>% filter(PainCatBinary != "Moderate")
 chisq.test(table(AgeVsPain))
+
+write.csv(table(AgeVsPain),  file="~/Documents/IowaWoundData2021/Pain_Age_whole_binary.csv")
 TableAgePain = (table(AgeVsPain))
 
-TableAgePain[,1] = TableAgePain[,1]/sum(TableAgePain[,1])
-TableAgePain[,2] = TableAgePain[,2]/sum(TableAgePain[,2])
+TableAgePain[,1] = round(TableAgePain[,1]/sum(TableAgePain[,1]),3)
+TableAgePain[,2] = round(TableAgePain[,2]/sum(TableAgePain[,2]),3)
+write.csv(TableAgePain,  file="~/Documents/IowaWoundData2021/Pain_Age_freq_binary.csv")
 
 
 FullDataWithRestingAge = FullData %>% left_join(ClinicalData %>% select(study_id, resting_pain_cat, woundage), by="study_id")
@@ -450,6 +558,7 @@ FullDataWithOtherClinicalsDressingAnaerobes$dressingcat = factor(FullDataWithOth
 
 attach(FullDataWithOtherClinicalsDressingAnaerobes)
 pairwise.wilcox.test( AnaerobicGenusAbundance_CLR,dressingcat, p.adjust.method = "none")
+detach(FullDataWithOtherClinicalsDressingAnaerobes)
 
 FullDataWithOtherClinicalsDressingMelt = FullDataWithOtherClinicalsDressing %>% select(AbundanceCLR, "BinaryDressingType") %>% melt(id.vars=c("BinaryDressingType"))
 
@@ -494,29 +603,65 @@ GenusDressingPlotAllTypes = ggplot(AllDressingTypesMeltStaphAnaerobes, aes(x=dre
 
 
 ggsave(GenusDressingPlotAllTypes, file="~/Documents/IowaWoundData2021/PaperFigs/GenusDressing_AllDressingTypes_StaphAnaerobes.pdf", height=7,width=8)
-TwoWayDressingCluster = FullDataWithOtherClinicalsDressing %>% select(DMMClusterAssign,dressingcat )
+
+TwoWayDressingCluster = FullDataWithOtherClinicalsDressing %>% select(DMMClusterAssign,dressingcat ) %>% na.omit()
 chisq.test(table(TwoWayDressingCluster))
-TwoWayDressingClusterBinary = FullDataWithOtherClinicalsDressing %>% select(DMMClusterAssign,BinaryDressingType )
+TwoWayDressingClusterBinary = FullDataWithOtherClinicalsDressing %>% select(DMMClusterAssign,BinaryDressingType ) %>% na.omit()
 chisq.test(table(TwoWayDressingClusterBinary))
 
-WoundtypeDressing = ClinicalData %>% select(dressingcat, wound_type)
+TableDressingTypeBinary_DMMs = table(TwoWayDressingClusterBinary)
+write.csv(TableDressingTypeBinary_DMMs,file="~/Documents/IowaWoundData2021/DressingType_DMM_Whole.csv")
+
+TableDressingTypeBinary_DMMs[,1] = TableDressingTypeBinary_DMMs[,1]/sum(TableDressingTypeBinary_DMMs[,1])
+TableDressingTypeBinary_DMMs[,2] = TableDressingTypeBinary_DMMs[,2]/sum(TableDressingTypeBinary_DMMs[,2])
+write.csv(TableDressingTypeBinary_DMMs,file="~/Documents/IowaWoundData2021/DressingType_DMM_Freq.csv")
+
+TwoWayDressingAll_DMM = table(TwoWayDressingCluster)
+write.csv(TwoWayDressingAll_DMM,file="~/Documents/IowaWoundData2021/DressingType_All_DMM_whole.csv")
+
+TwoWayDressingAll_DMM[,1] = round(TwoWayDressingAll_DMM[,1]/sum(TwoWayDressingAll_DMM[,1]),3)
+TwoWayDressingAll_DMM[,2] = round(TwoWayDressingAll_DMM[,2]/sum(TwoWayDressingAll_DMM[,2]),3)
+TwoWayDressingAll_DMM[,3] = round(TwoWayDressingAll_DMM[,3]/sum(TwoWayDressingAll_DMM[,3]),3)
+TwoWayDressingAll_DMM[,4] = round(TwoWayDressingAll_DMM[,4]/sum(TwoWayDressingAll_DMM[,4]),3)
+
+write.csv(TwoWayDressingAll_DMM,file="~/Documents/IowaWoundData2021/DressingType_All_DMM.csv")
+
+WoundtypeDressing = ClinicalData %>% select(wound_type,dressingcat)
 WoundtypeDressing = WoundtypeDressing %>% mutate(BinaryDressingType = if_else(dressingcat %in% c(0,2,3), "Other", "Adherent"))
-WoundtypeDressing= WoundtypeDressing %>% select(wound_type, BinaryDressingType)
+WoundtypeDressing= WoundtypeDressing %>% select(BinaryDressingType,wound_type )
 chisq.test(table(WoundtypeDressing))
 WoundtypeDressing = table(WoundtypeDressing)
+write.csv(WoundtypeDressing,file="~/Documents/IowaWoundData2021/DressingWoundTypeWhole.csv")
+
+
 WoundtypeDressing[,1] = WoundtypeDressing[,1]/sum(WoundtypeDressing[,1])
-WoundtypeDressing[,2] = WoundtypeDressing[,2]/sum(WoundtypeDressing[,2])No\\
+WoundtypeDressing[,2] = WoundtypeDressing[,2]/sum(WoundtypeDressing[,2])
 WoundtypeDressing[,3] = WoundtypeDressing[,3]/sum(WoundtypeDressing[,3])
 WoundtypeDressing[,4] = WoundtypeDressing[,4]/sum(WoundtypeDressing[,4])
 WoundtypeDressing[,5] = WoundtypeDressing[,5]/sum(WoundtypeDressing[,5])
 WoundtypeDressing[,6] = WoundtypeDressing[,6]/sum(WoundtypeDressing[,6])
-WoundtypeDressing[,7] = WoundtypeDressing[,7]/sum(WoundtypeDressing[,7])
 
 write.csv(TableWoundTypeDress,file="~/Documents/IowaWoundData2021/DressingWoundTypeFreq.csv")
 
 
-DressingFilter = FullDataWithOtherClinicals %>% select(DMMClusterAssign,dressingcat ) %>% melt(id.vars=c("dressingcat"))
-FullDataWithOtherClinicalsDressing = FullDataWithOtherClinicalsDressing %>% filter()
+WoundLocDressing = ClinicalData %>% select(dressingcat, woundloc)
+WoundLocDressing = WoundLocDressing %>% mutate(BinaryDressingType = if_else(dressingcat %in% c(0,2,3), "Other", "Adherent"))
+WoundLocDressingDF= WoundLocDressing %>% select( BinaryDressingType, woundloc)
+chisq.test(table(WoundLocDressingDF))
+
+WoundLocDressing = table(WoundLocDressingDF)
+write.csv(WoundLocDressing,file="~/Documents/IowaWoundData2021/DressingWoundLocWhole.csv")
+
+WoundLocDressing[,1] = round(WoundLocDressing[,1]/sum(WoundLocDressing[,1]),3)
+WoundLocDressing[,2] = round(WoundLocDressing[,2]/sum(WoundLocDressing[,2]),3)
+WoundLocDressing[,3] = round(WoundLocDressing[,3]/sum(WoundLocDressing[,3]),3)
+WoundLocDressing[,4] = round(WoundLocDressing[,4]/sum(WoundLocDressing[,4]),3)
+write.csv(WoundLocDressing,file="~/Documents/IowaWoundData2021/DressingWoundLocFreq.csv")
+
+
+
+DressingFilter = FullDataWithOtherClinicalsDressing %>% select(DMMClusterAssign,dressingcat ) %>% melt(id.vars=c("dressingcat"))
+FullDataWithOtherClinicalsDressing = FullDataWithOtherClinicalsDressing %>% filter(!is.na(DMMClusterAssign))
 dressingplot = ggplot(FullDataWithOtherClinicalsDressing, aes(x=dressingcat, fill=factor(DMMClusterAssign))) + geom_bar(stat="count",position="fill")  +  scale_fill_brewer(palette ="Dark2" ) + theme_classic() + 
   theme(axis.text.x=element_text(size=15), axis.text.y=element_text(size=15))
 
@@ -524,13 +669,13 @@ dressingplot = dressingplot +    scale_y_continuous(labels = scales::percent) + 
 dressingplotTotal  =  ggplot(FullDataWithOtherClinicalsDressing, aes(x=dressingcat, fill=factor(DMMClusterAssign))) + geom_bar(stat="count")  +  scale_fill_brewer(palette ="Dark2" ) + theme_classic() + 
   theme(axis.text.x=element_text(size=15), axis.text.y=element_text(size=15))
 
-ggsave(dressingplot, file="~/Documents/IowaWoundData2021/PaperFigs/DressingCategories.pdf")
+ggsave(dressingplot, file="~/Documents/IowaWoundData2021/PaperFigs/DressingCategories.pdf",width=6, height=5)
 
-DressingFilter = FullDataWithOtherClinicals %>% select(DMMClusterAssign,dressingcat ) %>% melt(id.vars=c("dressingcat"))
-dressingplot = ggplot(FullDataWithOtherClinicals, aes(x=dressingcat, fill=factor(DMMClusterAssign))) + geom_bar(stat="count",position="fill")  +  scale_fill_brewer(palette ="Dark2" ) + theme_classic() +
+DressingFilter = FullDataWithOtherClinicalsDressing %>% select(DMMClusterAssign,dressingcat ) %>% melt(id.vars=c("dressingcat")) 
+FullDataWithOtherClinicalsDressing = FullDataWithOtherClinicalsDressing %>% na.omit()
+dressingplot = ggplot(FullDataWithOtherClinicalsDressing, aes(x=dressingcat, fill=factor(DMMClusterAssign))) + geom_bar(stat="count",position="fill")  +  scale_fill_brewer(palette ="Dark2" ) + theme_classic() +
   theme(axis.text.x=element_text(size=15), axis.text.y=element_text(size=15))
-ggsave(dressingplot, file="~/Documents/IowaWoundData2021/PaperFigs/DressingCategories.pdf")
-
+ggsave(dressingplot, file="~/Documents/IowaWoundData2021/PaperFigs/DressingCategories.pdf", width=6, height=6)
 
 
 # Is the observed relationship between staphylococcus, anaerobic genera and dressing type due to wound depth?
@@ -550,73 +695,107 @@ DepthByDressing = ggplot(FullDataWithOtherClinicalsDressing, aes(x=factor(dressi
 ggsave(DepthByDressing,  file="~/Documents/IowaWoundData2021/PaperFigs/DressingByDepth.pdf", width=12,height=8)
 
 
+
+
+FullDataWithOtherWoundType= FullData %>% left_join(ClinicalData %>% select(wound_type, study_id, woundcarepain,resting_pain_cat))
+
+# GLM for wound depth and dressing (adherent mean = 4.048207 & 'other' mean = 2.620829 )
+###################################
+
+# https://sites.utexas.edu/sos/guided/inferential/numeric/glm/
+
+FullDataWithOtherClinicalsDressingLocation = FullDataWithOtherClinicalsDressing %>% left_join(ClinicalData %>% select(study_id, woundloc))
+FullDataWithOtherClinicalsDressingLocation$StaphylococcusAbundance_CLR
+
+FullDataWithOtherClinicalsDressingLocation$wound_dp_cube = ((FullDataWithOtherClinicalsDressingLocation$wound_dp)^(1/3))
+ModelWith=lm(StaphylococcusAbundance_CLR~ wound_dp_cube  + BinaryDressingType ,data=FullDataWithOtherClinicalsDressingLocation)
+ModelWithout = lm(StaphylococcusAbundance_CLR~ wound_dp_cube ,data=FullDataWithOtherClinicalsDressingLocation)
+anova(ModelWithout, ModelWith)
+
+FullDataWithOtherClinicalsDressingNoNon = FullDataWithOtherClinicalsDressing %>% filter(dressingcat != 0)
+
+# When you remove the 'non-adherent' category (no wound vacs), it takes away the relationship between depth and dressing type
+wilcox.test(FullDataWithOtherClinicalsDressingNoNon$wound_dp ~ FullDataWithOtherClinicalsDressingNoNon$BinaryDressingType)
+
+# it does not take away the relationship between anaerobic genera, staph genera CLR 
+t.test(FullDataWithOtherClinicalsDressingNoNon$AnaerobicGenusAbundance_CLR ~ FullDataWithOtherClinicalsDressingNoNon$BinaryDressingType)
+t.test(FullDataWithOtherClinicalsDressingNoNon$StaphylococcusAbundance_CLR ~ FullDataWithOtherClinicalsDressingNoNon$BinaryDressingType)
+
+
+cor_test(FullDataWithOtherClinicalsDressingNoNon, x="AnaerobicGenusAbundance_CLR", y="wound_dp", method="spearman")
+cor_test(FullDataWithOtherClinicalsDressingNoNon, x="StaphylococcusAbundance_CLR", y="wound_dp", method="spearman")
+
+
+
+
+
+
+wilcox.test(FullDataWithOtherClinicalsDressing$wound_dp ~ FullDataWithOtherClinicalsDressing$BinaryDressingType)
+
+ModelDressType = glm(StaphylococcusAbundance_CLR~BinaryDressingType ,data=FullDataWithOtherClinicalsDressing)
+
+ModelDepthType = glm(StaphylococcusAbundance_CLR~ wound_dp + wound+  BinaryDressingType ,data=FullDataWithOtherClinicalsDressing)
+summary(ModelDepthType)
+
+
+ModelDepthType = glm(AnaerobicGenusAbundance_CLR~ wound_dp + BinaryDressingType ,data=FullDataWithOtherClinicalsDressing)
+summary(ModelDepthType)
+
+################################################
+# (5) BIOLOGICAL VARIABLES  VS. WOUND  LOCATION
+###############################################
+
+# DMM Assignment
+WoundLocDMM = FullData %>% left_join(ClinicalData %>% select(dressingcat, study_id, woundloc))
+WoundLocDMM = table(WoundLocDMM %>% select(DMMClusterAssign, woundloc)) %>% na.omit()
+chisq.test(WoundLocDMM,simulate.p.value = T)
+
+
+write.csv(WoundLocDMM,file="~/Documents/IowaWoundData2021/WoundLocDMM_Whole.csv")
+
+WoundLocDMM[,1] = round(WoundLocDMM[,1]/sum(WoundLocDMM[,1]),3)
+WoundLocDMM[,2] = round(WoundLocDMM[,2]/sum(WoundLocDMM[,2]),3)
+WoundLocDMM[,3] = round(WoundLocDMM[,3]/sum(WoundLocDMM[,3]),3)
+WoundLocDMM[,4] = round(WoundLocDMM[,4]/sum(WoundLocDMM[,4]),3)
+
+write.csv(WoundLocDMM,file="~/Documents/IowaWoundData2021/WoundLocDMM_Freq.csv")
+
+WoundLoc_Genus = FullData %>% left_join(ClinicalData %>% select(study_id, woundloc))
+WoundLoc_Genus_Melt = WoundLoc_Genus %>% select(AbundanceCLR, "woundloc") %>% melt(id.vars=c("woundloc"))
+WoundLoc_Genus_Melt$Genus = sapply(WoundLoc_Genus_Melt$variable, function(x) str_split(x,pattern="Abundance_CLR")[[1]][1])
+
+WoundLocStats = WoundLoc_Genus_Melt %>% group_by(Genus) %>%  wilcox_test(value ~ woundloc)  %>% adjust_pvalue(method = "BH") %>% add_significance()  %>%  add_xy_position(x="Wound Location")
+
+
+WoundLoc_Genus_Melt$woundloc = factor(WoundLoc_Genus_Melt$woundloc)
+WoundLocGenusPlot = ggplot(WoundLoc_Genus_Melt, aes(x=woundloc, y=value, fill=Genus)) + geom_boxplot(alpha=.4,size=.25) + facet_grid(~ Genus)+
+  scale_fill_brewer(palette="Dark2") + geom_jitter(width=.2,size=.5) + theme_classic() +
+  ylim(0, 14) + xlab("Wound Location") + ggtitle("Common Genus Abundance in Wounds In Different Locations") + 
+  theme(plot.title=element_text(hjust=.5, size=18, face="bold"), axis.text.x=element_text(size=11),strip.text.x=element_text(size=13), axis.title.x=element_text(size=14), axis.title.y=element_text(size=14), legend.position="None") +
+  ylab("CLR-transformed relative abundance")  + stat_summary(fun= "mean", fun.max= "mean", fun.min= "mean", size= .3, geom = "crossbar",color="gray") 
+ggsave(WoundLocGenusPlot, file="~/Documents/IowaWoundData2021/PaperFigs/DMM_WoundLoc.pdf", width=12,height=8)
+
+
+
+
+################################################
+# (6) BIOLOGICAL VARIABLES  VS. ONE ANOTHER
+###############################################
+
+
+cor_test(data=FullData,x= "AnaerobicGenusAbundance_CLR", y="StaphylococcusAbundance_CLR", method="spearman")
+
+listCytokines = c("ARG1-Hs00163660_m1",  "C3-Hs00163811_m1",  "C5AR1-Hs00704891_s1", "CAMP-Hs00189038_m1",  "CXCL8-Hs00174103_m1", "IL1A-Hs00174092_m1",  "IL1B-Hs01555410_m1",
+                  "IL6-Hs00174131_m1", "LCN2-Hs01008571_m1", "MMP1-Hs00899658_m1", "MMP2-Hs01548727_m1", "MMP9-Hs00957562_m1", "TNF-Hs00174128_m1")
+
+
+
 # Cytokine data alone
 #######################
 
 listCytokines = c("ARG1-Hs00163660_m1",  "C3-Hs00163811_m1",  "C5AR1-Hs00704891_s1", "CAMP-Hs00189038_m1",  "CXCL8-Hs00174103_m1", "IL1A-Hs00174092_m1",  "IL1B-Hs01555410_m1",
 "IL6-Hs00174131_m1", "LCN2-Hs01008571_m1", "MMP1-Hs00899658_m1", "MMP2-Hs01548727_m1", "MMP9-Hs00957562_m1", "TNF-Hs00174128_m1")
-
-
-FullData_PlusAge = FullData %>% left_join(ClinicalData %>% select(study_id, woundage), by="study_id")
-FullData_PlusAge$wound_age = if_else(FullData_PlusAge$woundage %in% c(1, 2, 3), "Acute", "Chronic")
-
-
-# wound pain vs. wound age
-##########################
-FullData_TestSevereVsMildNone$Nmissing = rowSums(is.na(FullData_TestSevereVsMildNone %>% select(all_of(listCytokines))))
-dim(FullData_TestSevereVsMildNone %>% filter(Nmissing < 13))
-listPvalues = c()
-listcytokinesTested = c()
-listPvaluesNoneVsSevere = c()
-kruskal_ps = c()
-listpvalues_Age = c()
-for(cyt in listCytokines){
-  testresult = (wilcox.test((FullData_TestSevereVsMildNone[,cyt]) ~ FullData_TestSevereVsMildNone[,"PainCatBinary"],exact=F))
-  listcytokinesTested = c(listcytokinesTested, cyt)
-  listPvalues = c(listPvalues, testresult$p.value)
-  kruskal_all = kruskal.test(FullData[, cyt] ~ FullData[, "woundcarepain"])
-  kruskal_ps =append(kruskal_ps, kruskal_all$p.value)
-  
-  testResultAge =  (wilcox.test((FullData_PlusAge[,cyt]) ~ FullData_PlusAge[,"wound_age"], exact=F))
-  listpvalues_Age = c(listpvalues_Age, testResultAge$p.value)
-  
-}
-
-cytokines_age = data.frame(cytokine=listCytokines, pval=listpvalues_Age)
-
-FullData_TestSevereVsMildNone$Nmissing = rowSums(is.na(FullData_TestSevereVsMildNone %>% select(all_of(listCytokines))))
-dim(FullData_TestSevereVsMildNone %>% filter(Nmissing < 13))
-listPvalues = c()
-listcytokinesTested = c()
-listPvaluesNoneVsSevere = c()
-kruskal_ps = c()
-for(cyt in listCytokines){
-  testresult = (wilcox.test((FullData_TestSevereVsMildNone[,cyt]) ~ FullData_TestSevereVsMildNone[,"PainCatBinary"], exact=F))
-  listcytokinesTested = c(listcytokinesTested, cyt)
-  listPvalues = c(listPvalues, testresult$p.value)
-  kruskal_all = kruskal.test(FullData[, cyt] ~ FullData[, "woundcarepain"])
-  kruskal_ps =append(kruskal_ps, kruskal_all$p.value)
-}
-
-
-
-FullData_TestSevereVsMildNone$Nmissing = rowSums(is.na(FullData_TestSevereVsMildNone %>% select(all_of(listCytokines))))
-dim(FullData_TestSevereVsMildNone %>% filter(Nmissing < 13))
-listPvalues = c()
-listcytokinesTested = c()
-listPvaluesNoneVsSevere = c()
-kruskal_ps = c()
-for(cyt in listCytokines){
-  testresult = (wilcox.test((FullData_TestSevereVsMildNone[,cyt]) ~ FullData_TestSevereVsMildNone[,"PainCatBinary"], exact=F))
-  listcytokinesTested = c(listcytokinesTested, cyt)
-  listPvalues = c(listPvalues, testresult$p.value)
-  kruskal_all = kruskal.test(FullData[, cyt] ~ FullData[, "woundcarepain"])
-  kruskal_ps =append(kruskal_ps, kruskal_all$p.value)
-}
-
-
-
-
+length(listCytokines)
 
 # Cytokines vs. Microbiome data
 ###############################
@@ -629,87 +808,102 @@ for(cyt in listCytokines){
   
 }
 
-for(cyt in listCytokines){
-  if(cyt %in% c("C5AR1-Hs00704891_s1","CXCL8-Hs00174103_m1", "IL1B-Hs01555410_m1", "MMP2-Hs01548727_m1")){
-    
-    print(cyt)
-    print(pairwise.wilcox.test(FullData[,cyt],factor(FullData[,"DMMClusterAssign"]), p.adjust.method = "BH") )
-  }
-}
+DataFrameCytokineDMMs = data.frame(pvalsKruskalWallis =listkruskalPs, Cytokine=listkruskalCytokinesDMM )
+DataFrameCytokineDMMs$PAdjustKW = p.adjust(DataFrameCytokineDMMs$pvalsKruskalWallis, method="BH")
 
 
 FourCyts = FullData %>% select(c("C5AR1-Hs00704891_s1","CXCL8-Hs00174103_m1", "IL1B-Hs01555410_m1", "MMP2-Hs01548727_m1"))
 GenusVars = FullData %>% select(AbundanceCLR)
 DFCompare = cbind(FourCyts,GenusVars )
-pairs(DFCompare)
 
 
-
-DataFrameCytokineDMMs = data.frame(pvalsKruskalWallis =listkruskalPs, Cytokine=listkruskalCytokinesDMM )
-DataFrameCytokineDMMs$PAdjustKW = p.adjust(DataFrameCytokineDMMs$pvalsKruskalWallis, method="BH")
-
-FullData
-CytokineDataBySample = FullData %>% select(listCytokines, study_id, PainCatBinary, DMMClusterAssign, woundcarepain)
-
-numCytokines = FullDataDataPresent %>% select(-woundcarepain,-DMMClusterAssign ) 
-numCytokines$Ncyt = rowSums(numCytokines[2:ncol(numCytokines)])
-
-MeltCytokineDataBySample
-
-CytokineDataBySample = CytokineDataBySample %>% left_join(numCytokines %>% select(study_id, Ncyt),  by ="study_id")
-CytokineDataBySample_RemoveZeroCytokine = CytokineDataBySample %>% filter(Ncyt > 0 )
-MeltCytokineDataBySample = CytokineDataBySample_RemoveZeroCytokine %>% reshape2::melt(id.vars=(c("woundcarepain", "DMMClusterAssign", "PainCatBinary", "study_id", "Ncyt")))
-
-orderHeatMapDMM = ((CytokineDataBySample %>% arrange(DMMClusterAssign, Ncyt))$study_id)
-orderHeatMap = ((CytokineDataBySample %>% arrange(woundcarepain, Ncyt))$study_id)
-
-CytokineBySubjectPlot = ggplot(MeltCytokineDataBySample, aes(x=study_id, y=variable, fill=(value))) + geom_tile() + scale_fill_viridis(option="plasma", na.value="white")
-CytokineBySubjectPlot$data$study_id = factor(CytokineBySubjectPlot$data$study_id, levels=orderHeatMap)
-CytokineBySubjectPlot$data$variable = factor(CytokineBySubjectPlot$data$variable, levels=names(rev(sort(CytokineDataNonNAGr20))))
-
-CytokineBySubjectPlot = CytokineBySubjectPlot + theme_classic() + theme(axis.text.x=element_text(angle=90, hjust=.5, vjust=.5), axis.text.y=element_text(size=10), plot.title=element_text(face="bold", size=18, hjust=.5)) + ggtitle("Inflammatory Gene Expression by Patient (-∆CT)") + labs(fill="-∆CT")
-
-ggsave(CytokineBySubjectPlot, file="~/Documents/IowaWoundData2021/PaperFigs/InflamVsPatient.png",width=20, height=10)
-ggsave(CytokineBySubjectPlot, file="~/Documents/IowaWoundData2021/PaperFigs/InflamVsPatient.pdf",width=20, height=10)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-# DMM vs. markers
+# four cytokine markers of interest vs. DMM
+###########################################
 # "C5AR1-Hs00704891_s1","CXCL8-Hs00174103_m1", "IL1B-Hs01555410_m1", "MMP2-Hs01548727_m1"
 FullDataContainsMicrobiome = FullData %>% filter(!is.na(DMMClusterAssign))
-c5ar1plot = ggplot(FullDataContainsMicrobiome, aes(x=factor(DMMClusterAssign), y=(`C5AR1-Hs00704891_s1` ))) + geom_boxplot(fill="gray87") + theme_classic() + xlab("Microbial Community Type (DMM Assignment)") + ylab("-∆CT") + ggtitle("C5AR1 Expression") + theme(plot.title=element_text(hjust=.5, size=20, face="bold"))
-cxcl8plot  =  ggplot(FullDataContainsMicrobiome, aes(x=factor(DMMClusterAssign), y=(`CXCL8-Hs00174103_m1` ))) + geom_boxplot(fill="gray87") + theme_classic() + xlab("Microbial Community Type (DMM Assignment)") + ylab("-∆CT")+ ggtitle("CXCL8 Expression")+ theme(plot.title=element_text(hjust=.5, size=20, face="bold"))
-ilbplot  =  ggplot(FullDataContainsMicrobiome, aes(x=factor(DMMClusterAssign), y=(`IL1B-Hs01555410_m1` ))) + geom_boxplot(fill="gray87") + theme_classic() + xlab("Microbial Community Type (DMM Assignment)") + ylab("-∆CT")+ ggtitle("Il-1B Expression")+ theme(plot.title=element_text(hjust=.5, size=20, face="bold"))
-MMP2plot  =  ggplot(FullDataContainsMicrobiome, aes(x=factor(DMMClusterAssign), y=(`MMP2-Hs01548727_m1` ))) + geom_boxplot(fill="gray87") + theme_classic() + xlab("Microbial Community Type (DMM Assignment)") + ylab("-∆CT")+ ggtitle("MMP2 Expression")+ theme(plot.title=element_text(hjust=.5, size=20, face="bold"))
 
-gridExtra::grid.arrange(c5ar1plot, cxcl8plot, ilbplot, MMP2plot)
-
-ggplot(FullData, aes(x=(`CXCL8-Hs00174103_m1` ), y=(`IL1B-Hs01555410_m1`))) + geom_point()
-
-cor.test((FullData$`CXCL8-Hs00174103_m1` ), (FullData$`IL1B-Hs01555410_m1`))
-
-FullData %>% select(listCytokines) %>% mutate_all(.funs=(.))
+colorpalette4 = RColorBrewer::brewer.pal(4, "Dark2")
 
 
-# Correlations 
+C5ARStats = FullDataContainsMicrobiome %>% select(DMMClusterAssign, `C5AR1-Hs00704891_s1`) %>% wilcox_test(`C5AR1-Hs00704891_s1` ~ DMMClusterAssign) %>% add_xy_position() %>% filter(p.adj<.05)
+cxcl8Stats = FullDataContainsMicrobiome %>% select(DMMClusterAssign, `CXCL8-Hs00174103_m1`) %>% wilcox_test(`CXCL8-Hs00174103_m1` ~ DMMClusterAssign) %>% add_xy_position() %>% filter(p.adj<.05)
+ilbStats = FullDataContainsMicrobiome %>% select(DMMClusterAssign, `IL1B-Hs01555410_m1`) %>% wilcox_test(`IL1B-Hs01555410_m1` ~ DMMClusterAssign) %>% add_xy_position() %>% filter(p.adj<.05)
+MMP2Stats = FullDataContainsMicrobiome %>% select(DMMClusterAssign, `MMP2-Hs01548727_m1`) %>% wilcox_test(`MMP2-Hs01548727_m1` ~ DMMClusterAssign) %>% add_xy_position() %>% filter(p.adj<.05)
+
+
+
+c5ar1plot = ggplot(FullDataContainsMicrobiome, aes(x=factor(DMMClusterAssign), y=(`C5AR1-Hs00704891_s1` )),) + geom_boxplot(fill=colorpalette4[1]) + theme_classic() +
+  xlab("Microbial Community Type (DMM Assignment)") + ylab("-∆CT") + ggtitle("C5AR1 Expression") + theme(plot.title=element_text(hjust=.5, size=20, face="bold")) +
+  ggpubr::stat_pvalue_manual(C5ARStats, label="p.adj",size=6) +stat_summary(fun= "mean", fun.max= "mean", fun.min= "mean", size= .4, geom = "crossbar",color="gray68", alpha=.1)
+
+cxcl8plot  =  ggplot(FullDataContainsMicrobiome, aes(x=factor(DMMClusterAssign), y=(`CXCL8-Hs00174103_m1` ))) + geom_boxplot(fill=colorpalette4[2]) + theme_classic() +
+  xlab("Microbial Community Type (DMM Assignment)") + ylab("-∆CT")+ ggtitle("CXCL8 Expression")+ theme(plot.title=element_text(hjust=.5, size=20, face="bold")) + 
+  ggpubr::stat_pvalue_manual(cxcl8Stats, label="p.adj",size=6)+stat_summary(fun= "mean", fun.max= "mean", fun.min= "mean", size= .4, geom = "crossbar",color="gray68", alpha=.1)
+
+ilbplot  =  ggplot(FullDataContainsMicrobiome, aes(x=factor(DMMClusterAssign), y=(`IL1B-Hs01555410_m1` ))) + geom_boxplot(fill=colorpalette4[3]) + theme_classic() +
+  xlab("Microbial Community Type (DMM Assignment)") + ylab("-∆CT")+ ggtitle("Il-1B Expression")+ theme(plot.title=element_text(hjust=.5, size=20, face="bold"))+
+  ggpubr::stat_pvalue_manual(ilbStats, label="p.adj",size=6)+stat_summary(fun= "mean", fun.max= "mean", fun.min= "mean", size= .4, geom = "crossbar",color="gray68", alpha=.1)
+
+MMP2plot  =  ggplot(FullDataContainsMicrobiome, aes(x=factor(DMMClusterAssign), y=(`MMP2-Hs01548727_m1` ))) + geom_boxplot(fill=colorpalette4[4]) + theme_classic() +
+  xlab("Microbial Community Type (DMM Assignment)") + ylab("-∆CT")+ ggtitle("MMP2 Expression")+ theme(plot.title=element_text(hjust=.5, size=20, face="bold"))+
+  ggpubr::stat_pvalue_manual(MMP2Stats, label="p.adj",size=6)+stat_summary(fun= "mean", fun.max= "mean", fun.min= "mean", size= .4, geom = "crossbar",color="gray68", alpha=.1)
+
+pdf(file="~/Documents/IowaWoundData2021/PaperFigs/FourCytokinesVsDMM.pdf", height=7,width=9)
+gridExtra::grid.arrange(c5ar1plot, cxcl8plot, ilbplot, MMP2plot, ncol=2 )
+dev.off()
+
+# Genera vs. each cytokine
+##########################
+GeneraData = FullDataContainsMicrobiome %>% select(AbundanceCLR)
+CytokineData = FullDataContainsMicrobiome %>% select(colnames(FourCyts))
+CorrelationsGeneraCyt = matrix(0, nrow=ncol(GeneraData), ncol=ncol(CytokineData))
+CorrelationsGeneraCytPvalues = matrix(0, nrow=ncol(GeneraData), ncol=ncol(CytokineData))
+
+
+for(i in 1:ncol(GeneraData)){
+  for(j in 1:ncol(CytokineData)){
+    correlationtest = cor.test(GeneraData[, i], CytokineData[,j],method=c("spearman"),na.omit=T,exact=F )
+
+    CorrelationsGeneraCyt[i,j] = correlationtest$estimate
+    CorrelationsGeneraCytPvalues[i,j] = correlationtest$p.value
+    
+  }
+}
+PvalFrame = data.frame(CorrelationsGeneraCytPvalues)
+rownames(PvalFrame) = colnames(GeneraData)
+colnames(PvalFrame) = colnames(CytokineData)
+
+PvalFrame$Genera = row.names(PvalFrame)
+PvalFrameMelt = PvalFrame %>% reshape2::melt()
+PvalFrameMelt$pvalue = PvalFrameMelt$value
+PvalFrameMelt = PvalFrameMelt %>% select(Genera, variable, pvalue)
+
+CorrEstframe = data.frame(CorrelationsGeneraCyt)
+rownames(CorrEstframe) = colnames(GeneraData)
+colnames(CorrEstframe) = colnames(CytokineData)
+CorrEstframe$Genera=rownames(CorrEstframe)
+CorrelationsMeltedCytGenera = CorrEstframe %>% reshape2::melt()
+
+CorrelationsMeltedCytGenera = CorrelationsMeltedCytGenera %>% left_join(PvalFrameMelt, by=c("Genera", "variable"))
+CorrelationsMeltedCytGenera$pvalueRounded = round(CorrelationsMeltedCytGenera$pvalue, 6)
+
+CorrHeatMapGeneraCyt = ggplot(CorrelationsMeltedCytGenera, aes(x=variable, y=Genera, fill=value))+ geom_tile() + scale_fill_gradient2(high="red", low="blue", mid="white", midpoint=0) + xlab("") + ylab("") +
+  ggtitle("Correlations Between Inflammatory Marker Expression (-∆CT)\n and Common Wound Genera ") +theme_classic()+ theme(plot.title=element_text(size=20, hjust=.5), axis.text.x=element_text(size=15, angle=270), axis.text.y=element_text(size=15)) +
+  labs(fill="Spearman Correlation") + geom_text(aes(label=pvalueRounded)) + coord_equal()
+
+
+ggsave(CorrHeatMapGeneraCyt, file="~/Documents/IowaWoundData2021/PaperFigs/CorrelationGeneraCytokines.pdf", width=14,height=14)
+
+
+##########################################
+# Cytokine correlations with one another
+##########################################
 JustCyt = (FullData %>% select(listCytokines) )
-prcomp(JustCyt, na.omit)
-
 
 colnames(JustCyt) = sapply(colnames(JustCyt) , function(x) str_split(x, pattern="-")[[1]][1])
 JustCytCor = cor(JustCyt, use="pairwise.complete.obs")
 
+CorrelationMat = JustCytCor %>% melt()
 CorrelationMat$p = "NA"
 for(r in 1:nrow(CorrelationMat)){
   x=CorrelationMat[r, "Var1"]
@@ -721,71 +915,26 @@ for(r in 1:nrow(CorrelationMat)){
 CorrelationMatBonfNum = nrow(CorrelationMat %>% filter(Var1!=Var2))/2
 CorrelationMat$p = sapply(CorrelationMat$p, function(x) as.numeric(as.character(x)))
 CorrelationMat$pAdj = (CorrelationMat$p)*CorrelationMatBonfNum
-CorrelationMat = JustCytCor %>% reshape2::melt()
-View(CorrelationMat)
-CorrHeatMap = ggplot(CorrelationMat, aes(x=Var1, y=Var2, fill=value))+ geom_tile() + scale_fill_gradient2(high="red", low="blue", mid="white", midpoint=0) + xlab("") + ylab("") + ggtitle("Correlations Between Inflammatory\nMarker Expression (∆CT)") +theme_classic()+ theme(plot.title=element_text(size=20, hjust=.5), axis.text.x=element_text(size=15, angle=270), axis.text.y=element_text(size=15)) + labs(fill="Pearson's Correlation")
+
+
+CorrelationMat = CorrelationMat %>% mutate(significance = case_when(pAdj < .05 & pAdj >= .01 ~ "*", 
+                                                                    pAdj < .01 & pAdj >= .001 ~ "**",
+                                                                    pAdj < .001 & pAdj >= .0001 ~ "***",
+                                                                    pAdj < .0001 ~ "****",
+                                                                    TRUE ~  "")  )
+
+
+
+
+CorrHeatMap = ggplot(CorrelationMat, aes(x=Var1, y=Var2, fill=value))+ geom_tile() + scale_fill_gradient2(high="red", low="blue", mid="white", midpoint=0) + xlab("") + ylab("") +
+  ggtitle("Correlations Between Inflammatory\nMarker Expression (∆CT)") +theme_classic()+ theme(plot.title=element_text(size=20, hjust=.5), axis.text.x=element_text(size=15, angle=270), axis.text.y=element_text(size=15)) + labs(fill="Pearson's Correlation") +
+  coord_equal()
 
 Hclustering = hclust(as.dist(1-JustCytCor))
 
 CorrHeatMap$data$Var1 = factor(CorrHeatMap$data$Var1, levels=(Hclustering$labels)[Hclustering$order])
 CorrHeatMap$data$Var2 = factor(CorrHeatMap$data$Var2, levels=(Hclustering$labels)[Hclustering$order])
 
+ggsave(CorrHeatMap, file="~/Documents/IowaWoundData2021/PaperFigs/CorrelationCytokinesVCytokines.pdf", width=14,height=14)
 
-
-
-
-# # PCA with missing values on the cytokines
-# ############################################
-# dim(JustCyt)
-# dim(FullData)
-# 2^(-5.928095e-06 )
-# 
-# JustCytPCA = FullData %>% select(listCytokines, study_id)
-# JustCytPCA[,1:(ncol(JustCytPCA) - 1)] <- (JustCytPCA[,1:(ncol(JustCytPCA) - 1)])
-# 
-# JustCytPCA$NumMissing = rowSums(is.na(JustCytPCA))
-# 
-# JustCytPCA = JustCytPCA %>% filter(NumMissing < 7)
-# 
-# JustCytPCASubset = JustCytPCA %>% select(-NumMissing, -study_id)
-# 
-# ncompEst <- estim_ncpPCA(JustCytPCASubset,method.cv = "Kfold", verbose = FALSE) 
-# plot(0:5, ncompEst$criterion, xlab = "nb dim", ylab = "MSEP")
-# ImputedCytokinePCA = imputePCA(JustCytPCASubset, ncp = ncompEst$ncp)
-# dim(ImputedCytokinePCA$completeObs)
-# ImputedCytokinePCA = cbind(ImputedCytokinePCA$completeObs, JustCytPCA %>% select(study_id))
-# ImputedCytokinePCA$study_id = factor(ImputedCytokinePCA$study_id)
-# ImputedCytokinePCA = ImputedCytokinePCA %>% left_join(ClinicalData %>% select(study_id, wound_type,woundage,woundloc ), by="study_id") %>% select(-study_id, -woundloc,-wound_type)
-# ImputedCytokinePCA$woundage = sapply(ImputedCytokinePCA$woundage, function(x) as.character(x))
-# dim(ImputedCytokinePCA)
-# PCA_on_ImputatedVals <- PCA(ImputedCytokinePCA, quali.sup = 14, ncp = ncompEst$ncp, graph=FALSE)
-# PCA_on_ImputatedVals$var
-# PCA_on_ImputatedVals$quali.sup
-# plot(PCA_on_ImputatedVals, lab="none", habillage = 14, axes = c(3,4)) + scale_color_manual(values=c("#FFD86C", "#CCAA14", "#F18F49", "#E87200", "#CD4C46"))
-# 
-# JustCytPCA$PC1 = ((PCA_on_ImputatedVals$svd$U)[,1])
-# JustCytPCA$PC2 = ((PCA_on_ImputatedVals$svd$U)[,2])
-# 
-# JustCytPCADMMsOnly = JustCytPCA %>% filter(!is.na(DMMClusterAssign))
-# JustCytPCA = JustCytPCA %>% left_join(FullData %>% select(study_id, DMMClusterAssign), by="study_id") %>% left_join(ClinicalData %>% select(study_id, wound_type,inflame, woundloc,resting_pain_3cat,  woundage, woundcarepain, resting_pain), by="study_id")
-# ggplot(JustCytPCA, aes(x=factor(DMMClusterAssign), y=PC1) ) + geom_boxplot() + ggpubr::stat_compare_means()
-# ggplot(JustCytPCA, aes(x=factor(woundcarepain), y=PC1) ) + geom_boxplot() + ggpubr::stat_compare_means()
-# ggplot(JustCytPCADMMsOnly, aes(x=factor(DMMClusterAssign), y=PC1) ) + geom_boxplot() + ggpubr::stat_compare_means()
-# ggplot(JustCytPCA, aes(x=factor(woundcarepain), y=PC1) ) + geom_boxplot() + ggpubr::stat_compare_means()
-# ggplot(JustCytPCA, aes(x=factor(woundloc), y=PC1) ) + geom_boxplot() + ggpubr::stat_compare_means()
-# ggplot(JustCytPCA, aes(x=factor(woundage), y=PC1) ) + geom_boxplot() + ggpubr::stat_compare_means()
-# ggplot(JustCytPCA, aes(x=factor(resting_pain_3cat), y=PC1) ) + geom_boxplot() + ggpubr::stat_compare_means()
-# ggplot(JustCytPCA, aes(x=factor(inflame), y=PC2) ) + geom_boxplot() + ggpubr::stat_compare_means()
-
-
-InflammationVsMarkers = FullData %>% select(study_id, listCytokines) %>% left_join(ClinicalData %>% select(study_id, inflame), by="study_id")
- 
-InflammationVsMarkers = InflammationVsMarkers %>% melt(id.vars=c("inflame", "study_id"))
-colnames(InflammationVsMarkers) = c("inflame", "study_id", "markergene", "value")
-InflammationVsMarkers$inflame = if_else(InflammationVsMarkers$inflame==1, "Inflamed", "NotInflamed")
-InflammationVsMarkers$Value = (InflammationVsMarkers$value)
-InflammationVsMarkers$Value
-InflammationStats = InflammationVsMarkers %>% group_by(markergene) %>% wilcox_test(Value ~ (inflame))  %>% adjust_pvalue(method = "BH") %>% add_significance()  %>%  add_xy_position(x="inflame")
-InflammationStats$p.adj = round(InflammationStats$p.adj, 5)
-ggplot(InflammationVsMarkers, aes(x=(inflame), y=Value, fill=markergene)) + geom_boxplot() + facet_grid(.~markergene) + stat_pvalue_manual(InflammationStats, label="p.adj") + xlab("Clinical Inflammation") + scale_fill_brewer()
 
