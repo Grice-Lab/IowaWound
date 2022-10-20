@@ -164,7 +164,7 @@ FitDirichlets = mclapply(1:12, dmn, count=CountsDMMinput, verbose=TRUE, seed=191
 lplc <- sapply(FitDirichlets, laplace)
 
 # Save fit plot as fitplotDirichlet.jpeg
-jpeg("/Users/amycampbell/Documents/IowaWoundData2021/fitplotDirichlet.jpeg")
+pdf("/Users/amycampbell/Documents/IowaWoundData2021/PaperFigs/fitplotDirichlet.pdf", height=5,width=5)
 plot(lplc, type = 'b', xlab = 'Dirichlet Components',ylab='Model Fit', main="Dirichlet Components by Laplace Model Fit (Genus Read Counts)") 
 dev.off()
 
@@ -248,10 +248,18 @@ BatchCorrectedPhyloseq@sam_data$woundage = factor(BatchCorrectedPhyloseq@sam_dat
 ###############################
 
 BatchCorrectedPhyloseq@sam_data$woundAgeCat = if_else(BatchCorrectedPhyloseq@sam_data$woundage %in% c(1,2,3), "Acute", "Chronic")
+BatchCorrectedPhyloseq@sam_data$dressingcat = factor(BatchCorrectedPhyloseq@sam_data$dressingcat)
+
 BatchCorrectedPhyloseqNoModerates = subset_samples(BatchCorrectedPhyloseq, woundcarepain !=2)
 
 
 DMMordPlot = plot_ordination(BatchCorrectedPhyloseq, NMDSOrd, type="samples", color="assignment", title="Ordination of Genus-aggregated OTUs by DMM Assignment")  + scale_color_manual(values=rev(rando18_1[c(10, 11, 15, 17, 14, 1,8)]))
+
+
+
+DMMordPlot = DMMordPlot + theme_classic()
+ggsave(DMMordPlot, file="/Users/amycampbell/Documents/IowaWoundData2021/PaperFigs/DMMordinationPlot.pdf", width=8,height=8)
+
 ggsave(DMMordPlot, file="/Users/amycampbell/Documents/IowaWoundData2021/DMMordinationPlot.png")
 
 dfresults = (data.frame(BatchCorrectedPhyloseq@sam_data) %>% select(SubjectID, assignment))
@@ -348,6 +356,7 @@ MeltedTop12 = MeltedTop12 %>% group_by(GenusAdjust, assignment) %>% summarise(me
 MeltedTop12$abundance = MeltedTop12$`mean(Abundance)`
 generapresent  = ggplot(MeltedTop12, aes(x=as.factor(assignment), y=abundance, fill=GenusAdjust)) + geom_bar(stat = "identity", position = "stack",  color = NA) + scale_fill_manual(values=(color21)) + theme_minimal() + ggtitle("Top 12 Genera in Each DMM Component (Average %)") + xlab("DMM Assignment") + ylab("% Abundance")
 ggsave(generapresent, file="/Users/amycampbell/Documents/IowaWoundData2021/TopGeneraDMMsWithoutMock.png")
+ggsave(generapresent, file="/Users/amycampbell/Documents/IowaWoundData2021/PaperFigs/TopGeneraDMMsWithoutMock.pdf",height=8,width=8)
 
 SampleDist = data.frame(PlotTopGenera@sam_data)
 
