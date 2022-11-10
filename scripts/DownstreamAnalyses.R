@@ -645,6 +645,8 @@ write.csv(TableWoundTypeDress,file="~/Documents/IowaWoundData2021/DressingWoundT
 
 
 WoundLocDressing = ClinicalData %>% select(dressingcat, woundloc)
+chisq.test(table(WoundLocDressing))
+
 WoundLocDressing = WoundLocDressing %>% mutate(BinaryDressingType = if_else(dressingcat %in% c(0,2,3), "Other", "Adherent"))
 WoundLocDressingDF= WoundLocDressing %>% select( BinaryDressingType, woundloc)
 chisq.test(table(WoundLocDressingDF))
