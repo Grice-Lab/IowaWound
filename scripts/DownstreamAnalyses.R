@@ -341,6 +341,10 @@ DataFrameCytokinePain$PAdjust = p.adjust(DataFrameCytokinePain$pvals, method="BH
 DataFrameCytokinePain$PAdjustKruskal = p.adjust(DataFrameCytokinePain$kruskalp, method="BH")
 
 DataFrameCytokinePainJustWilcox = DataFrameCytokinePain %>% select(pvals, Cytokine, PAdjust)
+
+
+
+
 # Resting pain 
 ##############
 
@@ -433,7 +437,7 @@ GenusInflammationPlot = ggplot(DataMeltedGenusAbundanceInflammation, aes(x=infla
   scale_fill_brewer(palette ="Dark2" ) + geom_jitter(width=.2) + theme_classic() + ggpubr::stat_pvalue_manual(GenusStatsInflame, label="p.adj")+
   ylim(0, 14) + xlab("Inflammation (0/1)") + ggtitle("Common Genus Abundance in Wounds which are Inflamed vs. Not ") +
   theme(plot.title=element_text(hjust=.5, size=18, face="bold"), axis.text.x=element_text(size=11),strip.text.x=element_text(size=13), axis.title.x=element_text(size=14), axis.title.y=element_text(size=14), legend.position="None") + ylab("CLR-transformed relative abundance") 
-ggsave(GenusInflammationPlot, file="~/Documents/IowaWoundData2021/PaperFigs/GenusInflammation.pdf", width=10, height=7)
+ggsave(GenusInflammationPlot, file="~/Documents/IowaWoundData2021/PaperFigs/GenusInflammation.pdf", width=6, height=6)
 
 
 # Testing relationship between DMM Assignment, inflammation
@@ -487,7 +491,7 @@ colorWorkaround = colorWorkaround %>% mutate(colorAssign = if_else(inflame=="Inf
 MeltedInflammationMarkers$inflammation =(MeltedInflammationMarkers$inflame)
 boxplotinflame = ggplot(MeltedInflammationMarkers, aes(x=inflame, y=value))+ geom_boxplot(alpha=.8,fill=colorWorkaround$colorAssign, size=.25) +geom_jitter(width=.1,size=.5) + facet_grid(~Cytokine)   +
   theme_classic() + ggpubr::stat_pvalue_manual(GenusStatsInflameCytokine,label="p") +stat_summary(fun= "mean", fun.max= "mean", fun.min= "mean", size= .3, geom = "crossbar",color="gray") + ylab("-∆CT")
-ggsave(boxplotinflame, file="~/Documents/IowaWoundData2021/PaperFigs/InflammationCytokines.pdf", width=16, height=10)
+ggsave(boxplotinflame, file="~/Documents/IowaWoundData2021/PaperFigs/InflammationCytokines.pdf", width=10, height=8)
 
 
 ########################################################################################
@@ -514,6 +518,18 @@ GenusAgePlot = ggplot(FullDataAgeMeltGenus, aes(x=woundage, y=value, fill=Genus)
 
 
 ggsave(GenusAgePlot,file="~/Documents/IowaWoundData2021/PaperFigs/GenusByAge.pdf", width=10, height=5)
+
+# Etiology vs. DMM clusters
+###########################
+Cluster_WoundType = FullDataWithOtherClinicalsDressing %>% left_join(ClinicalData %>% select(study_id, wound_type), by="study_id") %>% select(DMMClusterAssign, wound_type) %>% filter(!is.na(DMMClusterAssign))
+
+Table_Cluster_Woundtype = table(Cluster_WoundType)
+Table_Cluster_Woundtype[,1] = round(Table_Cluster_Woundtype[,1] /sum(Table_Cluster_Woundtype[,1]),3)
+Table_Cluster_Woundtype[,2] = round(Table_Cluster_Woundtype[,2] /sum(Table_Cluster_Woundtype[,2]),3)
+Table_Cluster_Woundtype[,3] = round(Table_Cluster_Woundtype[,3] /sum(Table_Cluster_Woundtype[,3]),3)
+Table_Cluster_Woundtype[,4] = round(Table_Cluster_Woundtype[,4] /sum(Table_Cluster_Woundtype[,4]),3)
+Table_Cluster_Woundtype[,5] = round(Table_Cluster_Woundtype[,5] /sum(Table_Cluster_Woundtype[,5]),3)
+Table_Cluster_Woundtype[,6] = round(Table_Cluster_Woundtype[,6] /sum(Table_Cluster_Woundtype[,6]),3)
 
 # Age vs. genus within run
 ##########################
@@ -719,7 +735,7 @@ GenusDressingPlot_surgical = ggplot(FullDataWithOtherClinicalsDressing_Surgical_
   ylab("CLR-transformed relative abundance") +
   stat_summary(fun= "mean", fun.max= "mean", fun.min= "mean", size= .3, geom = "crossbar",color="gray") 
 
-ggsave(GenusDressingPlot_surgical, file="~/Documents/IowaWoundData2021/PaperFigs/GenusDressing_SurgicalMixedOnly.pdf", width=10, height=7)
+ggsave(GenusDressingPlot_surgical, file="~/Documents/IowaWoundData2021/PaperFigs/GenusDressing_SurgicalMixedOnly.pdf", width=9, height=7)
 
 
 
@@ -768,8 +784,15 @@ BinaryDMMCluster_WoundVac_SurgicalMixedOnlyTable[,1] = BinaryDMMCluster_WoundVac
 BinaryDMMCluster_WoundVac_SurgicalMixedOnlyTable[,2] = BinaryDMMCluster_WoundVac_SurgicalMixedOnlyTable[,2]/sum(BinaryDMMCluster_WoundVac_SurgicalMixedOnlyTable[,2])
 
 
+BinaryDMMCluster_WoundVac_SurgicalMixedOnly %>% ClinicalData
 # Wound depth as a confounding variable
 #########################################
+
+
+# across all wounds there is a relationship between depth and dressing type (wilcoxon p=.003149)
+FullDataWithOtherClinicalsDressing$study_id = sapply(FullDataWithOtherClinicalsDressing$study_id, as.integer)
+FullDataWithOtherClinicalsDressing = FullDataWithOtherClinicalsDressing %>% left_join(WoundDepthData, by="study_id")
+wilcox.test(wound_dp ~ BinaryDressingType, data=FullDataWithOtherClinicalsDressing)
 cor.test(FullDataWithOtherClinicalsDressing$wound_dp, FullDataWithOtherClinicalsDressing$AnaerobicGenusAbundance_CLR )
 #p=.006397 (positively correlated)
 
@@ -785,12 +808,6 @@ cor.test(FullDataWithOtherClinicalsDressing$wound_dp, FullDataWithOtherClinicals
 cor.test(FullDataWithOtherClinicalsDressing$wound_dp, FullDataWithOtherClinicalsDressing$PseudomonasAbundance_CLR )
 #p=.6856
 
-# across all wounds there is a relationship between depth and dressing type (wilcoxon p=.003149)
-FullDataWithOtherClinicalsDressing$study_id = sapply(FullDataWithOtherClinicalsDressing$study_id, as.integer)
-FullDataWithOtherClinicalsDressing = FullDataWithOtherClinicalsDressing %>% left_join(WoundDepthData, by="study_id")
-wilcox.test(wound_dp ~ BinaryDressingType, data=FullDataWithOtherClinicalsDressing)
-
-
 # but not among mixed/surgical alone (.5122)
 FullDataWithOtherClinicalsDressing_Surgical_Mixed$study_id=sapply(FullDataWithOtherClinicalsDressing_Surgical_Mixed$study_id, as.integer)
 FullDataWithOtherClinicalsDressing_Surgical_Mixed = FullDataWithOtherClinicalsDressing_Surgical_Mixed %>% left_join(WoundDepthData, by="study_id")
@@ -799,6 +816,8 @@ wilcox.test(wound_dp ~ BinaryDressingType, data=FullDataWithOtherClinicalsDressi
 
 # plot: wound depth vs. dressing type boxplots(no fill), where points are colored by wound type 
 ################################################################################################
+
+FullDataWithOtherClinicalsDressing$study_id = sapply(FullDataWithOtherClinicalsDressing$study_id, as.character)
 FullDataWithOtherClinicalsDressingTypes = FullDataWithOtherClinicalsDressing %>% left_join(ClinicalData %>% select(wound_type,study_id ))
 FullDataWithOtherClinicalsDressingTypes = FullDataWithOtherClinicalsDressingTypes %>% mutate(Wound_Type = case_when(wound_type==1 ~ "Pressure ulcer",
                                                                                                        wound_type ==2 ~"Venous ulcer",
@@ -833,6 +852,27 @@ WoundLocDressingProp[,2] = round(WoundLocDressingProp[,2]/sum(WoundLocDressingPr
 write.csv(WoundLocDressingProp,file="~/Documents/IowaWoundData2021/DressingWoundLocFreq.csv")
 
 
+listCytokines = c("ARG1-Hs00163660_m1",  "C3-Hs00163811_m1",  "C5AR1-Hs00704891_s1", "CAMP-Hs00189038_m1",  "CXCL8-Hs00174103_m1", "IL1A-Hs00174092_m1",  "IL1B-Hs01555410_m1",
+                  "IL6-Hs00174131_m1", "LCN2-Hs01008571_m1", "MMP1-Hs00899658_m1", "MMP2-Hs01548727_m1", "MMP9-Hs00957562_m1", "TNF-Hs00174128_m1")
+
+
+listPvaluesDress = c()
+listcytokinesTestedDress = c()
+
+for(cyt in listCytokines){
+  
+  testresult = (wilcox.test((FullDataWithOtherClinicalsDressing_Surgical_Mixed[,cyt]) ~ FullDataWithOtherClinicalsDressing_Surgical_Mixed[,"BinaryDressingType"],exact=F))
+  listcytokinesTestedDress = c(listcytokinesTestedDress, cyt)
+  listPvaluesDress = c(listPvaluesDress, testresult$p.value)
+  
+}
+
+DataFrameCytokineDress= data.frame( Cytokine=listcytokinesTestedDress,pvals = listPvaluesDress,padj = p.adjust(listPvaluesDress, method="BH"))
+
+FullDataWithOtherClinicalsDressing_Surgical_MixedWV  = FullDataWithOtherClinicalsDressing_Surgical_Mixed %>% subset(BinaryDressingType =="WoundVac" )
+FullDataWithOtherClinicalsDressing_Surgical_MixedNonWV  = FullDataWithOtherClinicalsDressing_Surgical_Mixed %>% subset(BinaryDressingType =="NonWoundVac" )
+mean(FullDataWithOtherClinicalsDressing_Surgical_MixedWV$`ARG1-Hs00163660_m1`, na.rm=T)
+mean(FullDataWithOtherClinicalsDressing_Surgical_MixedNonWV$`ARG1-Hs00163660_m1`, na.rm=T)
 
 ####################################################
 # (5) BIOLOGICAL VARIABLES  VS. WOUND  LOCATION/TYPE
