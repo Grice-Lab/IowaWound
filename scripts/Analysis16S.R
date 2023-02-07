@@ -437,7 +437,7 @@ topGenera = unique(topGenera)
 PlotTop12Genera = prune_taxa(topGenera, PlotTopGenera)
 
 
-MeltedTop12 = PlotTop12Genera %>% psmelt() %>% select(GenusAdjust, Abundance, assignment, study_id, )
+MeltedTop12 = PlotTop12Genera %>% psmelt() %>% select(GenusAdjust, Abundance, assignment, study_id )
 MeltedTop12 = MeltedTop12 %>% group_by(GenusAdjust, assignment) %>% summarise(mean(Abundance))
 MeltedTop12$abundance = MeltedTop12$`mean(Abundance)`
 generapresent  = ggplot(MeltedTop12, aes(x=as.factor(assignment), y=abundance, fill=GenusAdjust)) + geom_bar(stat = "identity", position = "stack",  color = NA) + scale_fill_manual(values=(color21)) + theme_minimal() + ggtitle("Top 12 Genera in Each DMM Component (Average %)") + xlab("DMM Assignment") + ylab("% Abundance")
@@ -777,9 +777,18 @@ Top12_anyDMMCluster = df_genera %>% filter(OTU %in% topGenera)
 
 
 PlotTop12Genera_AnyDMM_bySample = PlotTop12Genera %>% psmelt() %>% select(GenusAdjust, Abundance, assignment, study_id)
+
 Top12GeneraPlotSample = ggplot(PlotTop12Genera_AnyDMM_bySample, aes(x=study_id, y=Abundance, fill=GenusAdjust)) + geom_bar(stat="identity") + ggtitle("Genus-level composition") + scale_fill_manual(values=(color21))+ theme_minimal() + theme(axis.text.x=element_text(angle=90))
-OrderSamples = (FinalDF %>% arrange(DMMClusterAssign, -AnaerobicGenusAbundance, -StaphylococcusAbundance))$StudyID
+OrderSamples = (FinalDF %>% arrange(DMMClusterAssign, -StaphylococcusAbundance, AnaerobicGenusAbundance))$StudyID
 Top12GeneraPlotSample$data$study_id = factor(Top12GeneraPlotSample$data$study_id , levels=OrderSamples)
+
+ClusterDF=(FinalDF %>% arrange(DMMClusterAssign, -StaphylococcusAbundance, AnaerobicGenusAbundance))
+ClusterDF = ClusterDF %>% mutate(colortext=case_when(DMMClusterAssign==1 ~ "#4285F4", 
+                                    DMMClusterAssign==2 ~"#34A853",
+                                    DMMClusterAssign==3 ~ "#FBBC05", 
+                                    DMMClusterAssign==4 ~ "#EA4335"))
+colors = (ClusterDF %>% select(StudyID, colortext) %>% unique())$colortext
+Top12GeneraPlotSample = Top12GeneraPlotSample + theme(axis.text.x=element_text(color=colors))
 ggsave(Top12GeneraPlotSample, file="~/Documents/IowaWoundData2021/TopGenusAbundance_All_By_Cluster.pdf", width=20, height=6)
 
 FinalDF$AnaerobePrev = if_else(FinalDF$AnaerobicGenusAbundance>.001, 1, 0)

@@ -188,6 +188,43 @@ sampledata= sample_data(runinfo)
 PhyloseqObject = phyloseq(OTU_tab, taxa, sampledata, treeobject)
 PhyloseqObject@sam_data$TotalOTUs = colSums(OTU_tab@.Data)
 
+
+# Before any decontam
+######################3
+PhyloseqObject_Strep = subset_taxa(PhyloseqObject, Genus=="Streptococcus")
+PhyloseqObject_Staph = subset_taxa(PhyloseqObject, Genus=="Staphylococcus")
+
+df_Staph = PhyloseqObject_Staph %>% 
+  tax_glom(taxrank = "Species") %>%
+  transform_sample_counts(function(x) {x/sum(x)}) %>%
+  psmelt() %>% 
+  filter(Abundance > 0) %>%
+  group_by(Species)
+
+PhyloseqObjectRelAbundance = PhyloseqObject %>% 
+  tax_glom(taxrank = "Species") %>%
+  transform_sample_counts(function(x) {x/sum(x)}) %>%
+  psmelt() %>% 
+  filter(Abundance > 0)
+StaphRelativeAbundance = PhyloseqObjectRelAbundance %>% filter(Genus=="Staphylococcus")
+StrepRelativeAbundance = PhyloseqObjectRelAbundance %>% filter(Genus=="Streptococcus")
+StrepRelativeAbundance %>% group_by(Species) %>% summarize(relabundance=mean(Abundance)) %>% arrange(-relabundance)
+
+PhyloseqObjectRelAbundance %>% group_by(Species) %>% summarize(MeanRelAbundance = mean(Abundance)) %>% arrange(-MeanRelAbundance)
+
+
+plotStaph= ggplot(df_Staph, aes(x=SampleID, y=Abundance, fill=Species)) + geom_bar(stat="identity") + ggtitle("Species-level composition of Staphylococcus OTUs") + scale_fill_manual(values=(randpalette23))+ theme_minimal() + theme(axis.text.x=element_text(angle=90))
+
+df_Strep = PhyloseqObject_Strep %>% 
+  tax_glom(taxrank = "Species") %>%
+  transform_sample_counts(function(x) {x/sum(x)}) %>%
+  psmelt() %>% 
+  filter(Abundance > 0) %>%
+  group_by(Species)
+plotStrep = ggplot(df_Strep, aes(x=SampleID, y=Abundance, fill=Species)) + geom_bar(stat="identity") + ggtitle("Species-level composition of Streptococcus OTUs") + scale_fill_manual(values=(randpalette32))+ theme_minimal() + theme(axis.text.x=element_text(angle=90))
+
+
+
 # Subset to just Bacteria first of all
 PhyloseqObject = subset_taxa(PhyloseqObject, Kingdom=="Bacteria" )
 
@@ -467,6 +504,81 @@ save(PhyloseqObjectUpdated, file="PhyloSeqObjectPostDecontamMerged.rda")
 PhyloseqObjectUpdated =  subset_taxa(PhyloseqObjectUpdated, Phylum!="NA")
 
 
+#############################################################################################################################################
+# Before doing genus-level batch effect correction(but after decontamination) what is the species-level composition for staph, strep, coryne?  
+#############################################################################################################################################
+
+PhyloseqObjectUpdated_Relative = PhyloseqObjectUpdated %>% 
+  tax_glom(taxrank = "Species") %>%
+  transform_sample_counts(function(x) {x/sum(x)}) %>% 
+  psmelt() 
+View(PhyloseqObjectUpdated_Relative %>% group_by(Genus, Species) %>% summarize(MeanAbundance=mean(Abundance), Genus=Genus) %>% arrange(Genus, -MeanAbundance) %>% unique())
+
+
+
+PhyloseqObjectUpdated_Relative %>% filter(Genus=="Staphylococcus") %>% group_by(Species) %>% summarize(MeanAbundance=mean(Abundance)) %>% arrange(-MeanAbundance)
+PhyloseqObjectUpdated_Relative %>% filter(Genus=="Streptococcus") %>% group_by(Species) %>% summarize(MeanAbundance=mean(Abundance)) %>% arrange(-MeanAbundance)
+
+
+PhyloseqObjectUpdated_Staph = subset_taxa(PhyloseqObjectUpdated, Genus=="Staphylococcus")
+
+
+df_Staph = PhyloseqObjectUpdated_Staph %>% 
+  tax_glom(taxrank = "Species") %>%
+  transform_sample_counts(function(x) {x/sum(x)}) %>%
+  psmelt() %>% 
+  filter(Abundance > 0) %>%
+  group_by(Species)
+
+df_Staph$Species
+
+plotStaph= ggplot(df_Staph, aes(x=SampleID, y=Abundance, fill=Species)) + geom_bar(stat="identity") + ggtitle("Species-level composition of Staphylococcus OTUs") + scale_fill_manual(values=(randpalette23))+ theme_minimal() + theme(axis.text.x=element_text(angle=90))
+
+PhyloseqObjectUpdated_Strep = subset_taxa(PhyloseqObjectUpdated, Genus=="Streptococcus")
+
+df_Strep = PhyloseqObjectUpdated_Strep %>% 
+  tax_glom(taxrank = "Species") %>%
+  transform_sample_counts(function(x) {x/sum(x)}) %>%
+  psmelt() %>% 
+  filter(Abundance > 0) %>%
+  group_by(Species)
+plotStrep = ggplot(df_Strep, aes(x=SampleID, y=Abundance, fill=Species)) + geom_bar(stat="identity") + ggtitle("Species-level composition of Streptococcus OTUs") + scale_fill_manual(values=(randpalette32))+ theme_minimal() + theme(axis.text.x=element_text(angle=90))
+
+PhyloseqObject_Strep = subset_taxa(PhyloseqObject, Genus=="Streptococcus")
+PhyloseqObject_Staph = subset_taxa(PhyloseqObject, Genus=="Staphylococcus")
+
+
+df_Staph = PhyloseqObject_Staph %>% 
+  tax_glom(taxrank = "Species") %>%
+  transform_sample_counts(function(x) {x/sum(x)}) %>%
+  psmelt() %>% 
+  filter(Abundance > 0) %>%
+  group_by(Species)
+
+PhyloseqObjectRelAbundance = PhyloseqObject %>% 
+  tax_glom(taxrank = "Species") %>%
+  transform_sample_counts(function(x) {x/sum(x)}) %>%
+  psmelt() %>% 
+  filter(Abundance > 0)
+StaphRelativeAbundance = PhyloseqObjectRelAbundance %>% filter(Genus=="Staphylococcus")
+StrepRelativeAbundance = PhyloseqObjectRelAbundance %>% filter(Genus=="Streptococcus")
+StrepRelativeAbundance %>% group_by(Species) %>% summarize(relabundance=mean(Abundance)) %>% arrange(-relabundance)
+
+PhyloseqObjectRelAbundance %>% group_by(Species) %>% summarize(MeanRelAbundance = mean(Abundance)) %>% arrange(-MeanRelAbundance)
+
+
+plotStaph= ggplot(df_Staph, aes(x=SampleID, y=Abundance, fill=Species)) + geom_bar(stat="identity") + ggtitle("Species-level composition of Staphylococcus OTUs") + scale_fill_manual(values=(randpalette23))+ theme_minimal() + theme(axis.text.x=element_text(angle=90))
+
+df_Strep = PhyloseqObject_Strep %>% 
+  tax_glom(taxrank = "Species") %>%
+  transform_sample_counts(function(x) {x/sum(x)}) %>%
+  psmelt() %>% 
+  filter(Abundance > 0) %>%
+  group_by(Species)
+plotStrep = ggplot(df_Strep, aes(x=SampleID, y=Abundance, fill=Species)) + geom_bar(stat="identity") + ggtitle("Species-level composition of Streptococcus OTUs") + scale_fill_manual(values=(randpalette32))+ theme_minimal() + theme(axis.text.x=element_text(angle=90))
+
+
+
 ##############################################
 # Correcting for batch effects at Genus level
 ##############################################
@@ -506,7 +618,7 @@ TestUnifracPostBatchEffectGenus = prune_taxa(KeepTaxaTestGenusBatch, GenusLevelG
 # Since 120560 only had Mycoplasma after decontam, it's now an empty sample and has to be removed 
 TestUnifracPostBatchEffectGenus@sam_data$TotalOTUsLeftBatch = colSums(TestUnifracPostBatchEffectGenus@otu_table@.Data)
 TestUnifracPostBatchEffectGenus = subset_samples(TestUnifracPostBatchEffectGenus, TotalOTUsLeftBatch>1200)
-
+TestUnifracPostBatchEffectGenus
 UW_testUnifrac_PostBatchGenus =  phyloseq::distance(TestUnifracPostBatchEffectGenus, method="unifrac")
 W_testUnifrac_PostBatchGenus =   phyloseq::distance(TestUnifracPostBatchEffectGenus, method="wunifrac")
 
@@ -534,12 +646,13 @@ wUFgenus = wUFgenus + annotate(geom="text", x=-.6, y=.2, label=paste0("permanova
 uwUFGenus  = uwUFGenus + annotate(geom="text", x=-.22, y=.27, label=paste0("permanova_P=", prebatchPunweighted))
 
 
+
 gridarrangedUnifrac = gridExtra::grid.arrange(uwUFGenus, wUFgenus,plot_UW_postbatchGenus,plot_W_postbatchGenus )
 
 ggsave(gridarrangedUnifrac, file="/Users/amycampbell/Documents/IowaWoundData2021/UniFracPrePostBatch.pdf", width=20, height=15)
 
 
-
+#
 BatchCorrectedPhyloseq = TestUnifracPostBatchEffectGenus
 
 df_phyla= BatchCorrectedPhyloseq %>% 
@@ -575,3 +688,8 @@ plotPhyla$data$SampleID = factor(plotPhyla$data$Sample, levels =Desired_order)
 ggsave((plotPhyla + theme(axis.text.x = element_blank())), file="/Users/amycampbell/Documents/IowaWoundData2021/PhylumCompositionPostBatchCorrection.pdf", height=10, width=20)
 
 save(BatchCorrectedPhyloseq, file ="/Users/amycampbell/Documents/IowaWoundData2021/GenusLevelBatchCorrected.rda")
+
+
+
+
+

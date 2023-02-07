@@ -39,10 +39,19 @@ ClinicalData$resting_pain_cat = case_when( ClinicalData$resting_pain == 0.0 ~ "N
 WoundMicrobiome$study_id = sapply(WoundMicrobiome$StudyID, as.character)
 
 WoundDepthData = read.csv("~/Documents/IowaWoundData2021/wound_depth_covariate.csv")
+
+
+
+
+
+
+
 ##################################################################################
 # 0) PREPARE CYTOKINE DATA, MERGE WITH MICROBIOME DATA, AND SUMMARIZE COMPLETENESS
 ##################################################################################
 # correlation between pain types (resting vs. wound care)
+
+
 PainRatings = ClinicalData %>% select(resting_pain_cat, woundcarepain)
 PainRatings = PainRatings %>% mutate(OrdinalResting = case_when(resting_pain_cat=="None" ~ 0, 
                                                                 resting_pain_cat=="Mild" ~1, 
@@ -147,6 +156,45 @@ ggsave(DataAvailablePlotResting + theme(axis.text.x=element_blank()) + xlab("Pat
 ggsave(DataAvailablePlot + theme(axis.text.x=element_blank()) + xlab("Patient") + ylab("Biological Variable"), file="~/Documents/IowaWoundData2021/PaperFigs/DataPresence.pdf", width=20, height=4)
 ggsave(DataAvailablePlot + xlab("Patient") + ylab("Biological Variable"), file="~/Documents/IowaWoundData2021/PaperFigs/DataPresencePatientIDs.pdf", width=20, height=4)
 
+
+
+FullData =  FullData %>% mutate(Run=if_else(grepl(pattern="IowaWound.Human.", x=SampleID), "MiSeqV1V3_35", "MiSeqV1V3_32"))
+FullData$Run
+
+t.test(AnaerobicGenusAbundance_CLR~ Run, data=FullData)
+t.test(StaphylococcusAbundance_CLR~ Run, data=FullData)
+t.test(StreptococcusAbundance_CLR~ Run, data=FullData)
+t.test(PseudomonasAbundance_CLR~ Run, data=FullData)
+t.test(CorynebacteriumAbundance_CLR~ Run, data=FullData)
+
+wilcox.test(AnaerobicGenusAbundance_CLR~ Run, data=FullData)
+wilcox.test(StaphylococcusAbundance_CLR~ Run, data=FullData)
+wilcox.test(StreptococcusAbundance_CLR~ Run, data=FullData)
+wilcox.test(PseudomonasAbundance_CLR~ Run, data=FullData)
+wilcox.test(CorynebacteriumAbundance_CLR~ Run, data=FullData)
+
+FullDataMeltedRun = FullData %>% select(AnaerobicGenusAbundance_CLR,CorynebacteriumAbundance_CLR, PseudomonasAbundance_CLR, StaphylococcusAbundance_CLR,StreptococcusAbundance_CLR, Run) %>% melt()
+FullDataMeltedRun$Genus =  sapply(FullDataMeltedRun$variable, function(x) str_split(x,pattern="Abundance_CLR")[[1]][1])
+StatsByRun = FullDataMeltedRun %>% group_by(Genus) %>% wilcox_test(value ~ Run)  %>% adjust_pvalue(method = "BH") %>% add_significance()  %>%  add_xy_position(x="Run")
+PlotByRun =ggplot(FullDataMeltedRun, aes(x=Run, y=value, fill=Genus)) +stat_summary(fun= "mean", fun.max= "mean", fun.min= "mean", size= .4, geom = "crossbar",color="gray34", alpha=.1)+ geom_boxplot(alpha=.4, size=.25) + facet_grid(~ Genus) +
+  scale_fill_brewer(palette ="Dark2" ) + geom_jitter(width=.2) + theme_classic() + ggpubr::stat_pvalue_manual(StatsByRun, label="p") +
+  ylim(0, 14) + xlab("Pain Rating Category") + ggtitle("Genus Abundance by Microbiome Sequencing Run") +
+  theme(plot.title=element_text(hjust=.5, size=18, face="bold"), axis.text.x=element_text(size=11),strip.text.x=element_text(size=13), axis.title.x=element_text(size=14), axis.title.y=element_text(size=14), legend.position="None") + ylab("CLR-transformed relative abundance") 
+ggsave(PlotByRun, file="~/Documents/IowaWoundData2021/PaperFigs/Genus_by_Run.pdf",width=15, height=10)
+
+
+FullDataWithPain =FullData %>% left_join(ClinicalData, by="study_id")
+FullDataWithPain = FullDataWithPain %>% select(woundcarepain,Run) %>% mutate(PainCatBinary = case_when( woundcarepain==0 | woundcarepain==1  ~"NoneMild",
+                                                                                     woundcarepain==3~ "Severe", 
+                                                                                     woundcarepain==2 ~ "Moderate" 
+))
+# no difference between distribution of pain categories (binary) in the two runs 
+chisq.test(table(FullDataWithPain %>% filter(PainCatBinary != "Moderate") %>% select(PainCatBinary, Run)))
+
+FullDataDataPresent_Test = FullDataDataPresent
+FullDataDataPresent_Test = FullDataDataPresent_Test %>%  mutate(PainCatBinary = case_when( woundcarepain==0 | woundcarepain==1  ~"NoneMild",
+                                                                                           woundcarepain==3~ "Severe", 
+                                                                                           woundcarepain==2 ~ "Moderate" ))
 ###############################################################################
 # (1) WOUND  PAIN RATINGS VS. BIOLOGICAL  VARIABLES (microbiome then cytokines)
 ###############################################################################
@@ -224,9 +272,6 @@ GenusPainPlot32 = ggplot(DataMeltedGenusAbundance32, aes(x=PainCatBinary, y=valu
   scale_fill_brewer(palette ="Dark2" ) + geom_jitter(width=.2) + theme_classic() + ggpubr::stat_pvalue_manual(GenusStats32, label="p") +
   ylim(0, 14) + xlab("Pain Rating Category") + ggtitle("Common Genus Abundance in Wounds with \nSevere vs. None/Mild Pain Ratings (Run 32)") +
   theme(plot.title=element_text(hjust=.5, size=18, face="bold"), axis.text.x=element_text(size=11),strip.text.x=element_text(size=13), axis.title.x=element_text(size=14), axis.title.y=element_text(size=14), legend.position="None") + ylab("CLR-transformed relative abundance") 
-
-
-
 
 
 
@@ -605,19 +650,6 @@ TableAgePain[,2] = round(TableAgePain[,2]/sum(TableAgePain[,2]),3)
 write.csv(TableAgePain,  file="~/Documents/IowaWoundData2021/Pain_Age_freq_binary.csv")
 
 
-FullDataWithRestingAge = FullData %>% left_join(ClinicalData %>% select(study_id, resting_pain_cat, woundage), by="study_id")
-FullDataWithRestingAge = FullDataWithRestingAge %>% filter(resting_pain_cat != "Moderate")
-FullDataWithRestingAge$RestingBinary = if_else(FullDataWithRestingAge$resting_pain_cat=="Severe", "Severe", "NoneMild")
-
-AgeVsRestPain  = FullDataWithRestingAge %>% select(RestingBinary, woundage)
-AgeVsRestPain$woundage = if_else(AgeVsRestPain$woundage %in% c(1, 2), "Acute", "Chronic")
-TableAgeRest = table(AgeVsRestPain)
-chisq.test(table(AgeVsRestPain))
-TableAgeRest[,1] = TableAgeRest[,1]/sum(TableAgeRest[,1])
-TableAgeRest[,2] = TableAgePain[,2]/sum(TableAgeRest[,2])
-
-
-
 
 # wound type vs. age
 Age_Type = ClinicalData %>% select(woundage,wound_type)
@@ -785,6 +817,9 @@ BinaryDMMCluster_WoundVac_SurgicalMixedOnlyTable[,2] = BinaryDMMCluster_WoundVac
 
 
 BinaryDMMCluster_WoundVac_SurgicalMixedOnly %>% ClinicalData
+
+
+
 # Wound depth as a confounding variable
 #########################################
 
@@ -1088,4 +1123,15 @@ CorrHeatMap$data$Var2 = factor(CorrHeatMap$data$Var2, levels=(Hclustering$labels
 
 ggsave(CorrHeatMap, file="~/Documents/IowaWoundData2021/PaperFigs/CorrelationCytokinesVCytokines.pdf", width=14,height=14)
 
+FullDataWithOtherClinicalsDressingTestdist = FullDataWithOtherClinicalsDressing %>% filter(!is.na(DMMClusterAssign))
+FullDataWithOtherClinicalsDressingTestdist  = FullDataWithOtherClinicalsDressingTestdist %>% left_join(ClinicalData %>% select(wound_type, study_id), by="study_id")
+FullDataWithOtherClinicalsDressingTestdist$woundtype
+
+
+# since there is systematically more Staph in Run 35 than run 32, test whether BinaryDressingType is significant predictor of Staph abundance when you include "Run" as a covariate
+modelDressingStaph = glm(StaphylococcusAbundance_CLR ~ Run+ BinaryDressingType, data=FullDataWithOtherClinicalsDressing_Surgical_Mixed)
+modelDressingPseud = glm(PseudomonasAbundance_CLR ~ Run+ BinaryDressingType, data=FullDataWithOtherClinicalsDressing_Surgical_Mixed)
+
+modelPainStrep= glm(StreptococcusAbundance_CLR ~ Run +PainCatBinary ,data=FullData_TestSevereVsMildNoneCLRs)
+modelPainCoryne = glm(CorynebacteriumAbundance_CLR ~ Run +PainCatBinary ,data=FullData_TestSevereVsMildNoneCLRs)
 
