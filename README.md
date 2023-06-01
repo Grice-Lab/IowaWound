@@ -1,5 +1,5 @@
 # IowaWound
-Iowa Wound Pain analyses 2021-22
+Iowa Wound Pain sequence processing/analysis from 2021-23 are described below. Scripts to reproduce the figures and table values reported in Campbell et al. (2023) can be found [here](https://github.com/Grice-Lab/IowaWound/tree/master/PaperScripts)
 
 # (1) Make manifest .tsv’s for important already-demultiplexed reads
 
