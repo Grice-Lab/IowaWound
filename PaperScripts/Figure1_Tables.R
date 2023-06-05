@@ -787,10 +787,3 @@ AllDataBinaryPain = AllData %>% filter(woundcarepain != 2 ) %>% mutate(PainCatBi
                                                                                                   woundcarepain==3 ~ "Severe"))
 chisq.test(table(AllDataBinaryPain %>% select(PainCatBinary, woundloc)), simulate.p.value = T)
 
-
-
-wilcox.test(AnaerobicGenusAbundance_CLR~ Run, data=FullData)
-wilcox.test(StaphylococcusAbundance_CLR~ Run, data=FullData)
-wilcox.test(StreptococcusAbundance_CLR~ Run, data=FullData)
-wilcox.test(PseudomonasAbundance_CLR~ Run, data=FullData)
-wilcox.test(CorynebacteriumAbundance_CLR~ Run, data=FullData)
