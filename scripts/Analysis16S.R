@@ -106,7 +106,8 @@ Genus_code = function(tax_table_row){
 # Load data
 ############
 # (1) Phyloseq object with metadata, genus-level agglomerated & batch corrected 
-load("/Users/amycampbell/Documents/IowaWoundData2021/GenusLevelBatchCorrected.rda")
+load("/Users/amycampbell/Documents/IowaWoundData2021/PublicationData/GenusLevelBatchCorrected_Jan22.rda")
+
 AnaerobeMappings = read.csv("/Users/amycampbell/Documents/IowaWoundData2021/AnaerobeDB.csv")
 WoundDepth = read.csv("/Users/amycampbell/Documents/IowaWoundData2021/wound_depth_covariate.csv")
 
@@ -154,6 +155,14 @@ WoundTypeRun = ggplot(FinalSampleDist, aes(x=factor(Run), fill=factor(wound_type
 BatchCorrectedPhyloseq@sam_data = sample_data(FinalSampleDist)
 sample_names(BatchCorrectedPhyloseq) = (BatchCorrectedPhyloseq@sam_data$study_id)
 
+WeightedUnifracDists =  phyloseq::distance(BatchCorrectedPhyloseq, method="wunifrac")
+OrdinationWeightedUnifrac = ordinate(BatchCorrectedPhyloseq,"PCoA", distance=WeightedUnifracDists)
+BatchCorrectedPhyloseq@sam_data$woundcarepain = factor(BatchCorrectedPhyloseq@sam_data$woundcarepain)
+BatchCorrectedPhyloseq@sam_data$wound_type = factor(BatchCorrectedPhyloseq@sam_data$wound_type)
+BatchCorrectedPhyloseq@sam_data$woundloc = factor(BatchCorrectedPhyloseq@sam_data$woundloc)
+PlotWeightedUnifracPain = plot_ordination(BatchCorrectedPhyloseq, OrdinationWeightedUnifrac, color="woundcarepain") + scale_colour_manual(values=Paincolors) + ggtitle("Principal Coordinates (Genus-level weighted UniFrac distance) Wound Pain") + theme_classic()
+PlotWeightedUnifracType = plot_ordination(BatchCorrectedPhyloseq, OrdinationWeightedUnifrac, color="wound_type") + scale_colour_manual(values=rando18_1) + ggtitle("Principal Coordinates (Genus-level weighted UniFrac distance) Wound Type") + theme_classic()
+PlotWeightedUnifracLoc= plot_ordination(BatchCorrectedPhyloseq, OrdinationWeightedUnifrac, color="woundloc") + scale_colour_manual(values=rando18_1) + ggtitle("Principal Coordinates (Genus-level weighted UniFrac distance) Wound Location") + theme_classic()
 
 # DMM Clustering 
 ################
@@ -254,27 +263,18 @@ MeltedFitted = MeltedFitted %>% left_join(Genera, by="OTU")
    dfmelt = dfmelt %>% filter(OTU %in% topOTUs)
    plot = ggplot(dfmelt, aes(x=Genus,y=Value)) + geom_bar(stat="identity") + coord_flip() + labs(title=paste("Top Contributors to Cluster ", k ))
    plot$data$Genus = factor(plot$data$Genus, rev(dfmelt$Genus))
-   
+   plot
    ggsave(plot, file=paste0(paste0("/Users/amycampbell/Documents/IowaWoundData2021/DirichletContributorsCluster",k), ".png"))
    }
-
-
-
-
 
 
 dfresults = (data.frame(BatchCorrectedPhyloseq@sam_data) %>% select(SubjectID, assignment))
 resultssved = read.csv("Documents/IowaWoundData2021/PlotsForSue2022/WoundMicrobiomeDataForSEG_AEC.csv") %>% select(StudyID, DMMClusterAssign)
 
-
 topgenera = read.csv("Documents/IowaWoundData2021/PlotsForSue2022/WoundMicrobiomeDataForSEG_AEC.csv") %>% select(StudyID, Most_Abundant_Genus)
-
-
-
 
 # Ordination visualizations
 ###########################
-#0="Non-adherent" 1="Adherent" 2="Wound vac with non-adherent" 3="Wound vac without non-adherent"
 
 # Some sample variable coding
 #############################
@@ -599,6 +599,8 @@ write.csv(DF_Genera_Dominating5, file="/Users/amycampbell/Documents/IowaWoundDat
 
 BatchCorrectedPhyloseqRankingPercent = BatchCorrectedPhyloseqRanking %>%transform_sample_counts(function(x) {x/sum(x)})
 CLRTransformedPct = microbiome::transform(BatchCorrectedPhyloseqRankingPercent,transform="clr" )
+save(BatchCorrectedPhyloseqRankingPercent, file="/Users/amycampbell/Documents/IowaWoundData2021/PublicationData/RelativeAbundanceGenus.rda")
+save(CLRTransformedPct, file="/Users/amycampbell/Documents/IowaWoundData2021/PublicationData/CLRAbundanceGenus.rda")
 
 MeltedPct = BatchCorrectedPhyloseqRankingPercent %>% psmelt()
 MeltedCLR = CLRTransformedPct %>% psmelt()
@@ -657,6 +659,7 @@ FinalDF = FinalDF %>% left_join(ShannonDF, by="SampleID")
 
 
 write.csv(FinalDF, file="/Users/amycampbell/Documents/IowaWoundData2021/WoundMicrobiomeDataForSEG_AEC.csv")
+
 
 
 # Plot phylum by wound type
