@@ -2,10 +2,6 @@
 # To be submitted 2023
 # The heterogeneous wound microbiome varies with wound care pain, dressing practices, and inflammatory gene expression 
 
-#library("stringr")
-#library("vegan")
-#library("ggpubr")
-#
 
 #######################################
 # Figure 1: Wound microbiome variables
@@ -56,10 +52,11 @@ outputfolder="/Users/amycampbell/Documents/IowaWoundData2021/PublicationFiguresO
 load("/Users/amycampbell/Documents/IowaWoundData2021/PublicationData/GenusLevelBatchCorrected_Jan22.rda")
 AnaerobeMappings = read.csv("/Users/amycampbell/Documents/IowaWoundData2021/PublicationData/AnaerobeDB.csv")
 CytokineData = read.csv("~/Documents/IowaWoundData2021/PublicationData/InflammatoryMediators.csv")
+DiversityData = read.csv("~/Documents/IowaWoundData2021/PublicationData/DiversityMetrics.csv")
 
 # this is important to use-- includes wound care pain classifications with the cutoffs used in the
 # previous paper sfrom this dataset
-ClinicalData=read.csv("Documents/IowaWoundData2021/PublicationData/ClinicalData_UpdatedPain.csv")
+ClinicalData=read.csv("~/Documents/IowaWoundData2021/PublicationData/ClinicalData_UpdatedPain.csv")
 
 
 # Colors
@@ -781,9 +778,43 @@ sd(FullDataRMNamicrobes$StreptococcusAbundance,na.rm=T)*100
 
 table(ClinicalData$sex)
 
-
 # Comparing severe to mild/none pain
 AllDataBinaryPain = AllData %>% filter(woundcarepain != 2 ) %>% mutate(PainCatBinary = case_when( woundcarepain==0 | woundcarepain==1  ~"NoneMild",
-                                                                                                  woundcarepain==3 ~ "Severe"))
+                                                                                                  woundcarepain==3 ~"Severe"))
+       
+# Severe pain more common in locations 1(extremity), 3(head/neck), 4(inguinal) compared to location 2 (trunk)                                                                                                                                                                                          woundcarepain==3 ~ "Severe"))
 chisq.test(table(AllDataBinaryPain %>% select(PainCatBinary, woundloc)), simulate.p.value = T)
+
+# Boxplots of DMMs vs. different characteristics (Supplementary Figures added for 10/2023 Revisions)
+# Reviewers had asked about diversity metrics 
+#####################################################################################################
+DiversityData$StudyID = sapply(DiversityData$StudyID, as.character)
+
+DiversityData = DiversityData%>% select(StudyID, Genus_Richness, Genus_Shannon) %>% left_join(AllData, by="StudyID")
+
+richnessplot = ggplot(DiversityData,aes(x=factor(DMMClusterAssign),y=Genus_Richness)) + geom_boxplot() + theme_classic() + xlab("DMM Cluster") + ylab("Genus Richness") + stat_compare_means()
+shannonplot = ggplot(DiversityData,aes(x=factor(DMMClusterAssign),y=Genus_Shannon)) + geom_boxplot() + theme_classic() + xlab("DMM Cluster") + ylab("Shannon Diversity (Genera)") + stat_compare_means()
+gridExtra::grid.arrange(richnessplot, shannonplot,ncol=2)
+
+# there's a positive relationship between genus-level diversity, abudance of strict anaerobes
+#############################################################################################
+ggplot(DiversityData, aes(x=AnaerobicGenusAbundance_CLR, y=Genus_Shannon)) + geom_point() + geom_smooth(method="lm") + theme_classic()
+ggplot(DiversityData, aes(x=AnaerobicGenusAbundance_CLR, y=Genus_Richness)) + geom_point()+ geom_smooth(method="lm")+ theme_classic()
+
+cor.test(DiversityData$Genus_Richness, DiversityData$AnaerobicGenusAbundance_CLR)
+cor.test(DiversityData$Genus_Shannon, DiversityData$AnaerobicGenusAbundance_CLR)
+
+
+AllDataBinaryPainDiversity = AllDataBinaryPain %>% filter(!is.na(StudyID)) 
+AllDataBinaryPainDiversity = AllDataBinaryPainDiversity %>% left_join(DiversityData %>% select(StudyID, Genus_Richness, Genus_Shannon), by="StudyID")
+
+# no relationship between diversity and pain (reviewer asked)
+#############################################################################################
+ggplot(AllDataBinaryPainDiversity, aes(x=factor(PainCatBinary), y=Genus_Richness)) + geom_boxplot() + stat_compare_means()
+ggplot(AllDataBinaryPainDiversity, aes(x=factor(PainCatBinary), y=Genus_Shannon)) + geom_boxplot()+ stat_compare_means() 
+
+# no relationship between diversity and wound dressing type either
+#############################################################################################
+ggplot(DiversityData, aes(x=factor(BinaryDressingType), y=Genus_Shannon)) + geom_boxplot()+ stat_compare_means() 
+ggplot(DiversityData, aes(x=factor(BinaryDressingType), y=Genus_Richness)) + geom_boxplot()+ stat_compare_means() 
 
