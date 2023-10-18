@@ -9,6 +9,7 @@
 
 library(dplyr)
 library(stringr)
+library(ggplot2)
 
 ampalette <- rev(c("#B85C00","#999999","#339966","#6B24B2","#56B4E9","#D119A3","#006600", "#CC0000", 
                    "#4D4D4D", "#F0E442", "#CC99FF","#663300","#33CC33", "#0072B2", "#FF9900", 
@@ -18,6 +19,9 @@ ampalette <- rev(c("#B85C00","#999999","#339966","#6B24B2","#56B4E9","#D119A3","
 # 1. Read in all Strep-, Staph-annotated ASVs' top 5 BLASTN results to the 16S ribosomal RNA database from NCBI 
 ##################################################################################################################
 
+# wound microbiome data (update path as needed)
+woundmicrobiome = read.csv("/Users/amycampbell/Downloads/WoundMicrobiomeDataForSEG_AEC.csv")
+studyIDsIncluded = (woundmicrobiome %>% filter(!is.na(DMMClusterAssign)))$StudyID
 BlastResults = read.csv2("/Users/amycampbell/Documents/IowaWoundData2021/Qiime2Data/test_blast/StaphStrepOnly_Seqs/staph_strep_blast_withSubjName", sep="\t", header=F)
 colnames(BlastResults) = c("ASV", "sseqid", "pident", "length","mismatch","gapopen", "qcovs","evalue","bitscore","sscinames")
 
@@ -173,7 +177,7 @@ plot_bar(RelativeAbundStaph, fill="SpeciesClassificationBLAST") + scale_fill_man
 ampaletteStrep= c(ampalette, c("#000080", "#800000", "black"))
 
 
-bigpalette=c("#696969","#556B2F","#8B0000", "#808000", "#483D8B", "#008000", "#3CB371", "#008080", "#000080", "#CD5C5C", "#32CD32",
+bigpalette=c("#556B2F","#696969","#8B0000", "#808000", "#483D8B", "#008000", "#3CB371", "#008080", "#000080", "#CD5C5C", "#32CD32",
              "#DAA520", "#800080", "#FF4500","#00CED1", "#FF8C00", "#00FF00", "#00FA9A", "#dc143c", "#00BFFF", "#A020F0", "#ADFF2F", "#FF7f50",
              "#FF00FF", "#F0E68C","#FFFF54","#6495ED", "#DDA0DD", "#ADD8E6", "#7B68EE", "#7FFFD4","#FF69B4", "#FFE4C4", "#FFB6C1","#002D04")
 
@@ -190,4 +194,127 @@ JustStaphpMelted = RelativeAbundStaph %>% psmelt()
 
 pdf("~/Documents/IowaWoundData2021/NewFigs_Paper_10_23/StaphPctAbundance.pdf", width=20, height=8)
 plot_bar(RelativeAbundStaph, fill="SpeciesClassificationBLAST") + scale_fill_manual(values=bigpalette)
+dev.off()
+
+
+
+load("~/Downloads/StaphStrepASVassigned.rda")
+
+
+taxatable_staphstrep = data.frame(tax_table(StaphStrep))
+taxatable_staphstrep$OTU=NULL
+taxatable_staphstrep$ASV = NULL
+
+
+
+
+View(taxatable_staphstrep %>% select(Species,SpeciesClassificationBLAST ))
+
+taxatable_staphstrep$SpeciesClassificationBLAST
+
+taxatable_staphstrep = taxatable_staphstrep %>% mutate(SpeciesAdjusted = case_when( ((Species=="NA" | Species=="uncultured_organism") & (SpeciesClassificationBLAST!="NA")) ~ SpeciesClassificationBLAST,
+                                                             (!(Species=="NA" | Species=="uncultured_organism") & (SpeciesClassificationBLAST=="NA")) ~ Species,
+                                                             TRUE ~ as.character(SpeciesClassificationBLAST)))
+taxatable_staphstrep$Species=NULL
+taxatable_staphstrep$SpeciesClassificationBLAST=NULL                      
+                                
+
+AsTaxTableAdjusted = tax_table(taxatable_staphstrep)
+taxa_names(AsTaxTableAdjusted) = row.names(taxatable_staphstrep)
+
+colnames(AsTaxTableAdjusted) = colnames(taxatable_staphstrep)
+
+tax_table(StaphStrep) = AsTaxTableAdjusted
+
+StaphStrepAdjusted = StaphStrep %>% tax_glom(taxrank="SpeciesAdjusted")
+
+
+StaphStrepAdjusted = subset_samples(StaphStrepAdjusted, study_id %in% studyIDsIncluded)
+
+
+StaphOnly = subset_taxa(StaphStrepAdjusted, Genus=="Staphylococcus")
+StrepOnly = subset_taxa(StaphStrepAdjusted, Genus=="Streptococcus")
+
+
+StaphOnly_Relabund = StaphOnly %>%transform_sample_counts(function(x) {x/sum(x)})
+
+
+MaximumProportionStaph = apply(OTUs_Staph, 1, max)
+
+# 23 species of Staph assigned with at least 5% abundance in at least one sample
+AtLeast5 = MaximumProportionStaph[MaximumProportionStaph>0.05]
+StaphOnly_Relabund_AtLeast5 = StaphOnly_Relabund %>% subset_taxa( rownames(tax_table(StaphOnly_Relabund)) %in% names(AtLeast5))
+
+MeltedStaphAtLeast5Pct = StaphOnly_Relabund_AtLeast5 %>% psmelt()
+
+OTUTabStaph = (data.frame(StaphOnly_Relabund_AtLeast5@otu_table))
+t_OTUTabStaph = data.frame(t(OTUTabStaph))
+t_OTUTabStaph[is.na(t_OTUTabStaph)] <- 0
+SampleIDsOrderSepi_NA_aureus = (t_OTUTabStaph %>% arrange(X28791a195fb16e432f328fc38c217a16, X483181f68a1997d8d691fc99eb4d8919, X53fb12ba5d166f18c30e101ad3fefe25))$sampleID
+SampleIDsOrderSepi_NA_aureus = sapply(SampleIDsOrderSepi_NA_aureus, function(x) str_remove(x, "X"))
+
+t_OTUTabStaph$sampleID = colnames(OTUTabStaph)
+
+
+OrderStaphEpi_NA = unique((MeltedStaphAtLeast5Pct %>% arrange(wound_type, study_id) )$study_id)
+
+Plotstaph5pct = ggplot(MeltedStaphAtLeast5Pct, aes(x=SampleID,y=Abundance, fill=SpeciesAdjusted)) + geom_bar(stat="identity") + scale_fill_manual(values=bigpalette)+
+  theme_classic() + theme(axis.text.x=element_blank())
+
+Plotstaph5pct$data$SampleID = factor(Plotstaph5pct$data$SampleID, levels=SampleIDsOrderSepi_NA_aureus)
+
+
+OTUs_Staph = data.frame(StaphOnly_Relabund@otu_table)
+OTUs_Staph[is.na(OTUs_Staph)]<-0
+
+MeanAbund = rowMeans(OTUs_Staph)
+
+MostAbundantAvg = names(rev(sort(MeanAbund))[1:10])
+
+OTUs_Staph_top10Abundant = subset_taxa(StaphOnly_Relabund,  rownames(tax_table(StaphOnly_Relabund)) %in% MostAbundantAvg)
+
+
+
+
+
+StrepOnly_Relabund = StrepOnly %>%transform_sample_counts(function(x) {x/sum(x)})
+OTUs_Strep = data.frame(StrepOnly_Relabund@otu_table)
+OTUs_Strep[is.na(OTUs_Strep)]<-0
+
+# strep salivarius, strep thermophilus, NA most abundant 
+
+# 7136faeb92b8894cfb389206ac8828f9, beb20ef494d6232af88af5f79dea8650, dc4c06e76c80792a6dd6a5170e96a392   
+# StrepOnly_Relabund@tax_table[rev(c("dc4c06e76c80792a6dd6a5170e96a392","beb20ef494d6232af88af5f79dea8650","7136faeb92b8894cfb389206ac8828f9")),]
+
+
+MeanAbundStrep = sort(rowMeans(OTUs_Strep))
+MaximumProportionStrep = apply(OTUs_Strep, 1, max)
+
+# 36 taxa assigned with at least 5% abundance in at least one sample
+AtLeast5 = MaximumProportionStrep[MaximumProportionStrep>0.05]
+StrepOnly_Relabund_AtLeast5 = StrepOnly_Relabund %>% subset_taxa( rownames(tax_table(StrepOnly_Relabund)) %in% names(AtLeast5))
+
+MeltedStrepAtLeast5Pct = StrepOnly_Relabund_AtLeast5 %>% psmelt()
+
+OTUTabStrep = (data.frame(StrepOnly_Relabund_AtLeast5@otu_table))
+t_OTUTabStrep = data.frame(t(OTUTabStrep))
+t_OTUTabStrep[is.na(t_OTUTabStrep)] <- 0
+SampleIDsOrderMostAbundant3 = (t_OTUTabStrep %>% arrange(X7136faeb92b8894cfb389206ac8828f9, beb20ef494d6232af88af5f79dea8650, dc4c06e76c80792a6dd6a5170e96a392))$sampleID
+SampleIDsOrderMostAbundant3 = sapply(SampleIDsOrderMostAbundant3, function(x) str_remove(x, "X"))
+
+t_OTUTabStrep$sampleID = colnames(OTUTabStrep)
+
+bigpalette2 = bigpalette=c("#696969", "#556B2F","#8B0000", "#808000", "#483D8B", "#008000", "#3CB371", "#008080", "#000080", "#CD5C5C", "#32CD32",
+                           "#DAA520", "#800080", "#FF4500","#00CED1", "#FF8C00", "#00FF00", "#00FA9A", "#dc143c", "#00BFFF", "#A020F0", "#ADFF2F", "#FF7f50",
+                           "#FF00FF", "#F0E68C","#FFFF54","#6495ED", "#DDA0DD", "#ADD8E6", "#7B68EE", "#7FFFD4","#FF69B4", "#FFE4C4", "#FFB6C1","#004600", "black")
+
+OrderStrepEpi_NA = unique((MeltedStrepAtLeast5Pct %>% arrange(wound_type, study_id) )$study_id)
+
+PlotStrep5pct = ggplot(MeltedStrepAtLeast5Pct, aes(x=SampleID,y=Abundance, fill=SpeciesAdjusted)) + geom_bar(stat="identity") + scale_fill_manual(values=bigpalette2)+
+  theme_classic() + theme(axis.text.x=element_blank())
+
+PlotStrep5pct$data$SampleID = factor(PlotStrep5pct$data$SampleID, levels=SampleIDsOrderMostAbundant3)
+
+pdf("~/Documents/Staph_Strep.pdf", width=20, height=20)
+gridExtra::grid.arrange(PlotStrep5pct, Plotstaph5pct, ncol=1)
 dev.off()
