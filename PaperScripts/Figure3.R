@@ -11,7 +11,7 @@ library("viridis")
 library("gplots")
 library("rstatix")
 library("sanon")
-
+library("GGally")
 #library("correlation")
 #library("psych")
 #library("sanon")
@@ -56,38 +56,37 @@ StratifiedEstimates = c()
 Coryne_Pain_strat = sanon(CorynebacteriumAbundance_CLR ~ grp(PainCatBinary, ref="NoneMild") + strt(Run) , data=FullData_TestSevereVsMildNone)
 SummaryCorynePain = summary(Coryne_Pain_strat)
 pvalues_genus_stratified = append(StratifiedPvalues, SummaryCorynePain$coefficients[4])
-StratifiedEstimates = append(StratifiedEstimates, SummaryCorynePain$coefficients[1])
+StratifiedEstimates = append(StratifiedEstimates, Coryne_Pain_strat$xi)
 
 # Streptococcus 
 Streptococcus_Pain_Strat = sanon(StreptococcusAbundance_CLR ~ grp(PainCatBinary, ref="NoneMild") + strt(Run) , data=FullData_TestSevereVsMildNone)
 SummaryStrepPain = summary(Streptococcus_Pain_Strat)
 pvalues_genus_stratified= append(pvalues_genus_stratified, SummaryStrepPain$coefficients[4])
-StratifiedEstimates = append(StratifiedEstimates, SummaryStrepPain$coefficients[1])
+StratifiedEstimates = append(StratifiedEstimates, Streptococcus_Pain_Strat$xi)
 
 
 # Staphylococcus
 Staphylococcus_Pain_strat = sanon(StaphylococcusAbundance_CLR ~ grp(PainCatBinary, ref="NoneMild") + strt(Run) , data=FullData_TestSevereVsMildNone)
 SummaryStaphPain = summary(Staphylococcus_Pain_strat)
 pvalues_genus_stratified = append(pvalues_genus_stratified, SummaryStaphPain$coefficients[4])
-StratifiedEstimates = append(StratifiedEstimates, SummaryStaphPain$coefficients[1])
+StratifiedEstimates = append(StratifiedEstimates, Staphylococcus_Pain_strat$xi)
 
 # Pseudomonas
 Pseudomonas_Pain_strat = sanon(PseudomonasAbundance_CLR ~ grp(PainCatBinary, ref="NoneMild") + strt(Run) , data=FullData_TestSevereVsMildNone)
 SummaryPseudomonasPain = summary(Pseudomonas_Pain_strat)
 pvalues_genus_stratified = append(pvalues_genus_stratified, SummaryPseudomonasPain$coefficients[4])
-StratifiedEstimates = append(StratifiedEstimates, SummaryPseudomonasPain$coefficients[1])
+StratifiedEstimates = append(StratifiedEstimates, Pseudomonas_Pain_strat$xi)
 
-
+# anaerobes
 Anaerobes_Pain_strat = sanon(AnaerobicGenusAbundance_CLR ~ grp(PainCatBinary, ref="NoneMild") + strt(Run) , data=FullData_TestSevereVsMildNone)
 SummaryAnaerobesPain = summary(Anaerobes_Pain_strat)
 pvalues_genus_stratified = append(pvalues_genus_stratified, SummaryAnaerobesPain$coefficients[4])
-StratifiedEstimates = append(StratifiedEstimates, SummaryAnaerobesPain$coefficients[1])
+StratifiedEstimates = append(StratifiedEstimates, Anaerobes_Pain_strat$xi)
 
 GenusAbundances = data.frame(Genus=AbundanceCLR,pvalue=pvalues_genus_stratified,estimates=StratifiedEstimates )
 
 Genera = AbundanceCLR
-StratifiedPvalues = c()
-StratifiedEstimates = c()
+
 
 GenusAbundances$padj = p.adjust(GenusAbundances$pvalue, method="BH")
 
@@ -107,12 +106,224 @@ DataMeltedGenusAbundance$Genus = sapply(DataMeltedGenusAbundance$variable, funct
 
 
  GenusPainPlot = ggplot(DataMeltedGenusAbundance, aes(x=PainCatBinary, y=value, fill=Genus)) +stat_summary(fun= "mean", fun.max= "mean", fun.min= "mean", size= .4, geom = "crossbar",color="gray34", alpha=.1)+ geom_boxplot(alpha=.4, size=.25) + facet_grid(~ Genus) +
-    scale_fill_brewer(palette ="Dark2" ) + geom_jitter(width=.2) + theme_classic() +
-    ylim(0, 14) + xlab("Pain Rating Category") + ggtitle("Common Genus Abundance in Wounds with \nSevere vs. None/Mild Pain Ratings") +
+    scale_fill_brewer(palette ="Dark2" ) + geom_jitter(width=.2) + theme_classic()  +
+    ylim(-1.2, 12.5) + xlab("Pain Rating Category") + ggtitle("Common Genus Abundance in Wounds with \nSevere vs. None/Mild Pain Ratings") +
     theme(plot.title=element_text(hjust=.5, size=18, face="bold"), axis.text.x=element_text(size=11),strip.text.x=element_text(size=13), axis.title.x=element_text(size=14), axis.title.y=element_text(size=14), legend.position="None") + ylab("CLR.transformed relative abundance") 
   
 ggsave(GenusPainPlot, file=paste0(outputfolder, "Figure3a.pdf"))
- 
+ggsave(GenusPainPlot, file="Documents/IowaWoundData2021/NewFigs_Paper_10_23/New_3a.pdf",width=12, height=6)
+
+# Genera ~ wound duration + healing -- are Strep and Coryne still associated w/ healing when you stratify on wound duration(≤30 days vs. >30 days)?
+####################################################################################################################################################
+FullData_TestSevereVsMildNone_AgePain = FullData_TestSevereVsMildNone %>% mutate(WoundAgeBin = if_else(woundage %in% c(1,2), "Less30", "Gr30"))
+Genera_AgePain = AbundanceCLR
+StratifiedPvalues_Age_Pain = c()
+StratifiedEstimates_AgePain = c()
+
+# Corynebacterium
+Coryne_Pain_strat_age = sanon(CorynebacteriumAbundance_CLR ~ grp(PainCatBinary, ref="NoneMild") + strt(Run ) + strt(WoundAgeBin) , data=FullData_TestSevereVsMildNone_AgePain)
+SummaryCorynePain_age = summary(Coryne_Pain_strat_age)
+pvalues_genus_stratified_age = append(StratifiedPvalues_Age_Pain, SummaryCorynePain_age$coefficients[4])
+StratifiedEstimates_AgePain = append(StratifiedEstimates_AgePain, Coryne_Pain_strat_age$xi)
+
+# Streptococcus 
+Streptococcus_Pain_Strat_age = sanon(StreptococcusAbundance_CLR ~ grp(PainCatBinary, ref="NoneMild") + strt(Run) + strt(WoundAgeBin) , data=FullData_TestSevereVsMildNone_AgePain)
+SummaryStrepPain_age = summary(Streptococcus_Pain_Strat_age)
+pvalues_genus_stratified_age= append(pvalues_genus_stratified_age, SummaryStrepPain_age$coefficients[4])
+StratifiedEstimates_AgePain = append(StratifiedEstimates_AgePain, Streptococcus_Pain_Strat_age$xi)
+
+# Staphylococcus
+Staphylococcus_Pain_strat_age = sanon(StaphylococcusAbundance_CLR ~ grp(PainCatBinary, ref="NoneMild") + strt(Run) + strt(WoundAgeBin) , data=FullData_TestSevereVsMildNone_AgePain)
+SummaryStaphPain = summary(Staphylococcus_Pain_strat_age)
+pvalues_genus_stratified_age = append(pvalues_genus_stratified_age, SummaryStaphPain$coefficients[4])
+StratifiedEstimates_AgePain = append(StratifiedEstimates_AgePain, Staphylococcus_Pain_strat$xi)
+
+# Pseudomonas
+Pseudomonas_Pain_strat_age = sanon(PseudomonasAbundance_CLR ~ grp(PainCatBinary, ref="NoneMild") + strt(Run)+ strt(WoundAgeBin)  , data=FullData_TestSevereVsMildNone_AgePain)
+SummaryPseudomonasPain = summary(Pseudomonas_Pain_strat_age)
+pvalues_genus_stratified_age = append(pvalues_genus_stratified_age, SummaryPseudomonasPain$coefficients[4])
+StratifiedEstimates_AgePain = append(StratifiedEstimates_AgePain, Pseudomonas_Pain_strat_age$xi)
+
+# anaerobes
+Anaerobes_Pain_strat_age = sanon(AnaerobicGenusAbundance_CLR ~ grp(PainCatBinary, ref="NoneMild") + strt(Run) + strt(WoundAgeBin) , data=FullData_TestSevereVsMildNone_AgePain)
+SummaryAnaerobesPain = summary(Anaerobes_Pain_strat_age)
+pvalues_genus_stratified_age = append(pvalues_genus_stratified_age, SummaryAnaerobesPain$coefficients[4])
+StratifiedEstimates_AgePain = append(StratifiedEstimates_AgePain, Anaerobes_Pain_strat_age$xi)
+
+
+
+GenusPainPlot = ggplot(DataMeltedGenusAbundance, aes(x=PainCatBinary, y=value, fill=Genus)) +stat_summary(fun= "mean", fun.max= "mean", fun.min= "mean", size= .4, geom = "crossbar",color="gray34", alpha=.1)+ geom_boxplot(alpha=.4, size=.25) + facet_grid(~ Genus) +
+  scale_fill_brewer(palette ="Dark2" ) + geom_jitter(width=.2) + theme_classic()  +
+  ylim(-1.2, 12.5) + xlab("Pain Rating Category") + ggtitle("Common Genus Abundance in Wounds with \nSevere vs. None/Mild Pain Ratings") +
+  theme(plot.title=element_text(hjust=.5, size=18, face="bold"), axis.text.x=element_text(size=11),strip.text.x=element_text(size=13), axis.title.x=element_text(size=14), axis.title.y=element_text(size=14), legend.position="None") + ylab("CLR.transformed relative abundance") 
+
+MeltedByAge = FullData_TestSevereVsMildNone_AgePain %>% select(CorynebacteriumAbundance_CLR, StreptococcusAbundance_CLR, StaphylococcusAbundance_CLR, PseudomonasAbundance_CLR, AnaerobicGenusAbundance_CLR, WoundAgeBin,PainCatBinary ) %>% melt(id.vars=c("PainCatBinary","WoundAgeBin"))
+
+MeltedByAge_Pre = MeltedByAge %>% filter(WoundAgeBin=="Less30")
+MeltedByAge_Post = MeltedByAge %>% filter(WoundAgeBin=="Gr30")
+
+Age_Pain_Pre =ggplot(MeltedByAge_Pre, aes(x=factor(PainCatBinary), y=value, fill=factor(variable))) + geom_boxplot(alpha=.4, size=.25) + geom_jitter(height=0, width=.2) + theme_classic() +scale_fill_brewer(palette ="Dark2" )+ facet_grid(.~variable) +ylim(-1.2, 12.5)
+
+Age_Pain_Post = ggplot(MeltedByAge_Post, aes(x=factor(PainCatBinary), y=value, fill=factor(variable))) + geom_boxplot(alpha=.4, size=.25) + geom_jitter(height=0, width=.2) + theme_classic() +scale_fill_brewer(palette ="Dark2" )+ facet_grid(.~variable) +ylim(-1.2, 12.5)
+
+
+
+MeltedByAge_Pre$Genus = sapply(MeltedByAge_Pre$variable, function(x) str_split(x, pattern="Abundance_CLR")[[1]][1])
+GenusStatsPainPre = MeltedByAge_Pre %>% group_by(Genus) %>% wilcox_test(value ~ PainCatBinary)  %>% adjust_pvalue(method = "BH") %>% add_significance()  %>%  add_xy_position(x="PainCatBinary")
+GenusStatsPainPre$xmin=1
+GenusStatsPainPre$xmax=2
+
+MeltedByAge_Post$Genus = sapply(MeltedByAge_Post$variable, function(x) str_split(x, pattern="Abundance_CLR")[[1]][1])
+GenusStatsPainPost = MeltedByAge_Post %>% group_by(Genus) %>% wilcox_test(value ~ PainCatBinary)  %>% adjust_pvalue(method = "BH") %>% add_significance()  %>%  add_xy_position(x="PainCatBinary")
+GenusStatsPainPost$xmin=1
+GenusStatsPainPost$xmax=2
+
+
+GenusPainPlot_Pre30 = ggplot(MeltedByAge_Pre, aes(x=PainCatBinary, y=value, fill=Genus)) +stat_summary(fun= "mean", fun.max= "mean", fun.min= "mean", size= .4, geom = "crossbar",color="gray34", alpha=.1)+ geom_boxplot(alpha=.4, size=.25) + facet_grid(~ Genus) +
+  scale_fill_brewer(palette ="Dark2" ) + geom_jitter(width=.2) + theme_classic()  + stat_pvalue_manual(GenusStatsPainPre, label="p")+
+  ylim(-1.2, 12.5)  + xlab("Pain Rating Category") + ggtitle("Common Genus Abundance in Wounds with \nSevere vs. None/Mild Pain Ratings (≤30 days old)") +
+  theme(plot.title=element_text(hjust=.5, size=18, face="bold"), axis.text.x=element_text(size=11),strip.text.x=element_text(size=13), axis.title.x=element_text(size=14), axis.title.y=element_text(size=14), legend.position="None") + ylab("CLR.transformed relative abundance") 
+
+
+GenusPainPlot_Post30 = ggplot(MeltedByAge_Post, aes(x=PainCatBinary, y=value, fill=Genus)) +stat_summary(fun= "mean", fun.max= "mean", fun.min= "mean", size= .4, geom = "crossbar",color="gray34", alpha=.1)+ geom_boxplot(alpha=.4, size=.25) + facet_grid(~ Genus) +
+  scale_fill_brewer(palette ="Dark2" ) + geom_jitter(width=.2) + theme_classic()  + stat_pvalue_manual(GenusStatsPainPost, label="p")+
+  ylim(-1.2, 12.5)  + xlab("Pain Rating Category") + ggtitle("Common Genus Abundance in Wounds with \nSevere vs. None/Mild Pain Ratings (>30 days old)") +
+  theme(plot.title=element_text(hjust=.5, size=18, face="bold"), axis.text.x=element_text(size=11),strip.text.x=element_text(size=13), axis.title.x=element_text(size=14), axis.title.y=element_text(size=14), legend.position="None") + ylab("CLR.transformed relative abundance") 
+
+pdf("Documents/IowaWoundData2021/NewFigs_Paper_10_23/New_S3b.pdf", width=8, height=12)
+grid.arrange(GenusPainPlot_Pre30, GenusPainPlot_Post30, ncol=1)
+dev.off()
+
+# Alternative to Figure S3B: Just make the shapes of the points based on the age category
+MeltedByAge$Genus = sapply(MeltedByAge$variable, function(x) str_split(x, pattern="Abundance_CLR")[[1]][1])
+GenusPainPlot_Age_Shape = ggplot(MeltedByAge, aes(x=PainCatBinary, y=value, fill=Genus)) +stat_summary(fun= "mean", fun.max= "mean", fun.min= "mean", size= .4, geom = "crossbar",color="gray34", alpha=.1)+ geom_boxplot(alpha=.4, size=.25) + facet_grid(~ Genus) +
+  scale_fill_brewer(palette ="Dark2" ) + geom_jitter(aes(shape=WoundAgeBin),width=.2) + theme_classic()  + stat_pvalue_manual(GenusStatsPainPre, label="p")+
+  ylim(-1.2, 12.5)  + xlab("Pain Rating Category") + ggtitle("Common Genus Abundance in Wounds with \nSevere vs. None/Mild Pain Ratings (≤30 days old)") +
+  theme(plot.title=element_text(hjust=.5, size=18, face="bold"), axis.text.x=element_text(size=11),strip.text.x=element_text(size=13), axis.title.x=element_text(size=14), axis.title.y=element_text(size=14), legend.position="None") + ylab("CLR.transformed relative abundance") 
+
+GenusPainPlot_Age_Shape
+
+# Stratified by wound location
+################################
+FullData_TestSevereVsMildNone_locPain = FullData_TestSevereVsMildNone# %>% mutate(woundloc = if_else(woundloc %in% c(1,2), "Less30", "Gr30"))
+Genera_locPain = AbundanceCLR
+StratifiedPvalues_loc_Pain = c()
+StratifiedEstimates_locPain = c()
+
+# Corynebacterium
+Coryne_Pain_strat_loc = sanon(CorynebacteriumAbundance_CLR ~ grp(PainCatBinary, ref="NoneMild") + strt(Run ) + strt(woundloc) , data=FullData_TestSevereVsMildNone_locPain)
+SummaryCorynePain_loc = summary(Coryne_Pain_strat_loc)
+pvalues_genus_stratified_loc = append(StratifiedPvalues_loc_Pain, SummaryCorynePain_loc$coefficients[4])
+StratifiedEstimates_locPain = append(StratifiedEstimates_locPain, Coryne_Pain_strat_loc$xi)
+
+# Streptococcus 
+Streptococcus_Pain_Strat_loc = sanon(StreptococcusAbundance_CLR ~ grp(PainCatBinary, ref="NoneMild") + strt(Run) + strt(woundloc) , data=FullData_TestSevereVsMildNone_locPain)
+SummaryStrepPain_loc = summary(Streptococcus_Pain_Strat_loc)
+pvalues_genus_stratified_loc= append(pvalues_genus_stratified_loc, SummaryStrepPain_loc$coefficients[4])
+StratifiedEstimates_locPain = append(StratifiedEstimates_locPain, Streptococcus_Pain_Strat_loc$xi)
+
+# Staphylococcus
+Staphylococcus_Pain_strat_loc = sanon(StaphylococcusAbundance_CLR ~ grp(PainCatBinary, ref="NoneMild") + strt(Run) + strt(woundloc) , data=FullData_TestSevereVsMildNone_locPain)
+SummaryStaphPain = summary(Staphylococcus_Pain_strat_loc)
+pvalues_genus_stratified_loc = append(pvalues_genus_stratified_loc, SummaryStaphPain$coefficients[4])
+StratifiedEstimates_locPain = append(StratifiedEstimates_locPain, Staphylococcus_Pain_strat$xi)
+
+# Pseudomonas
+Pseudomonas_Pain_strat_loc = sanon(PseudomonasAbundance_CLR ~ grp(PainCatBinary, ref="NoneMild") + strt(Run)+ strt(woundloc)  , data=FullData_TestSevereVsMildNone_locPain)
+SummaryPseudomonasPain = summary(Pseudomonas_Pain_strat_loc)
+pvalues_genus_stratified_loc = append(pvalues_genus_stratified_loc, SummaryPseudomonasPain$coefficients[4])
+StratifiedEstimates_locPain = append(StratifiedEstimates_locPain, Pseudomonas_Pain_strat_loc$xi)
+
+# anaerobes
+Anaerobes_Pain_strat_loc = sanon(AnaerobicGenusAbundance_CLR ~ grp(PainCatBinary, ref="NoneMild") + strt(Run) + strt(woundloc) , data=FullData_TestSevereVsMildNone_locPain)
+SummaryAnaerobesPain = summary(Anaerobes_Pain_strat_loc)
+pvalues_genus_stratified_loc = append(pvalues_genus_stratified_loc, SummaryAnaerobesPain$coefficients[4])
+StratifiedEstimates_locPain = append(StratifiedEstimates_locPain, Anaerobes_Pain_strat_loc$xi)
+
+
+
+GenusPainPlot = ggplot(DataMeltedGenusAbundance, aes(x=PainCatBinary, y=value, fill=Genus)) +stat_summary(fun= "mean", fun.max= "mean", fun.min= "mean", size= .4, geom = "crossbar",color="gray34", alpha=.1)+ geom_boxplot(alpha=.4, size=.25) + facet_grid(~ Genus) +
+  scale_fill_brewer(palette ="Dark2" ) + geom_jitter(width=.2) + theme_classic()  +
+  ylim(-1.2, 12.5) + xlab("Pain Rating Category") + ggtitle("Common Genus Abundance in Wounds with \nSevere vs. None/Mild Pain Ratings") +
+  theme(plot.title=element_text(hjust=.5, size=18, face="bold"), axis.text.x=element_text(size=11),strip.text.x=element_text(size=13), axis.title.x=element_text(size=14), axis.title.y=element_text(size=14), legend.position="None") + ylab("CLR.transformed relative abundance") 
+
+
+
+MeltedByloc = FullData_TestSevereVsMildNone_locPain %>% select(CorynebacteriumAbundance_CLR, StreptococcusAbundance_CLR, StaphylococcusAbundance_CLR, PseudomonasAbundance_CLR, AnaerobicGenusAbundance_CLR, woundloc,PainCatBinary ) %>% melt(id.vars=c("PainCatBinary","woundloc"))
+MeltedByloc$Genus = sapply(MeltedByloc$variable, function(x) str_split(x, pattern="Abundance_CLR")[[1]][1])
+
+
+MeltedByloc1 = MeltedByloc %>% filter(woundloc==1)
+MeltedByloc2 = MeltedByloc %>% filter(woundloc==2)
+MeltedByloc4 = MeltedByloc %>% filter(woundloc==4)
+
+GenusStatsMeltedByloc1 = MeltedByloc1 %>% group_by(Genus) %>% wilcox_test(value ~ PainCatBinary)  %>% adjust_pvalue(method = "BH") %>% add_significance()  %>%  add_xy_position(x="PainCatBinary")
+GenusStatsMeltedByloc2 = MeltedByloc2 %>% group_by(Genus) %>% wilcox_test(value ~ PainCatBinary)  %>% adjust_pvalue(method = "BH") %>% add_significance()  %>%  add_xy_position(x="PainCatBinary")
+GenusStatsMeltedByloc4 = MeltedByloc4 %>% group_by(Genus) %>% wilcox_test(value ~ PainCatBinary)  %>% adjust_pvalue(method = "BH") %>% add_significance()  %>%  add_xy_position(x="PainCatBinary")
+
+
+loc1=ggplot(MeltedByloc1, aes(x=factor(PainCatBinary), y=value, fill=Genus)) + geom_boxplot(alpha=.4, size=.25) + 
+  geom_jitter(height=0, width=.2) + theme_classic() + facet_grid(.~Genus) +ylim(-1.2, 12.5) + scale_fill_brewer(palette="Dark2") +
+  stat_pvalue_manual(GenusStatsMeltedByloc1,label="p")
+loc2=ggplot(MeltedByloc2, aes(x=factor(PainCatBinary), y=value, fill=(Genus))) + geom_boxplot(alpha=.4, size=.25) + 
+  geom_jitter(height=0, width=.2) + theme_classic() + facet_grid(.~Genus) +ylim(-1.2, 12.5)+ scale_fill_brewer(palette="Dark2")+
+  stat_pvalue_manual(GenusStatsMeltedByloc2,label="p")
+loc4=ggplot(MeltedByloc4, aes(x=factor(PainCatBinary), y=value, fill=factor(Genus))) + geom_boxplot(alpha=.4, size=.25) + 
+  geom_jitter(height=0, width=.2) + theme_classic() + facet_grid(.~Genus) +ylim(-1.2, 12.5)+ scale_fill_brewer(palette="Dark2")+
+  stat_pvalue_manual(GenusStatsMeltedByloc4,label="p")
+
+pdf("Documents/IowaWoundData2021/NewFigs_Paper_10_23/New_S3c.pdf", width=9, height=12)
+grid.arrange(loc1, loc2, loc4,ncol=1)
+dev.off()
+
+
+# Steve suggests stratifying on both variables
+###############################################
+FullData_TestSevereVsMildNone_locAgePain = FullData_TestSevereVsMildNone %>% mutate(WoundAgeBin = if_else(woundage %in% c(1,2), "Less30", "Gr30"))
+
+
+Genera_loc_age_Pain = AbundanceCLR
+StratifiedPvalues_loc_age_Pain = c()
+StratifiedEstimates_age_locPain = c()
+
+# Corynebacterium
+Coryne_Pain_strat_loc = sanon(CorynebacteriumAbundance_CLR ~ grp(PainCatBinary, ref="NoneMild") + strt(Run )+ strt(WoundAgeBin) + strt(woundloc) , data=FullData_TestSevereVsMildNone_locAgePain)
+SummaryCorynePain_loc = summary(Coryne_Pain_strat_loc)
+pvalues_genus_stratified_loc_age = append(StratifiedPvalues_loc_age_Pain, SummaryCorynePain_loc$coefficients[4])
+StratifiedEstimates_age_locPain = append(StratifiedEstimates_age_locPain, Coryne_Pain_strat_loc$xi)
+
+# Streptococcus 
+Streptococcus_Pain_Strat_loc = sanon(StreptococcusAbundance_CLR ~ grp(PainCatBinary, ref="NoneMild") + strt(Run)+ strt(WoundAgeBin) + strt(woundloc) , data=FullData_TestSevereVsMildNone_locAgePain)
+SummaryStrepPain_loc = summary(Streptococcus_Pain_Strat_loc)
+pvalues_genus_stratified_loc_age= append(pvalues_genus_stratified_loc_age, SummaryStrepPain_loc$coefficients[4])
+StratifiedEstimates_age_locPain = append(StratifiedEstimates_age_locPain, Streptococcus_Pain_Strat_loc$xi)
+
+# Staphylococcus
+Staphylococcus_Pain_strat_loc = sanon(StaphylococcusAbundance_CLR ~ grp(PainCatBinary, ref="NoneMild") + strt(Run)+ strt(WoundAgeBin) + strt(woundloc) , data=FullData_TestSevereVsMildNone_locAgePain)
+SummaryStaphPain = summary(Staphylococcus_Pain_strat_loc)
+pvalues_genus_stratified_loc_age = append(pvalues_genus_stratified_loc_age, SummaryStaphPain$coefficients[4])
+StratifiedEstimates_age_locPain = append(StratifiedEstimates_age_locPain, Staphylococcus_Pain_strat$xi)
+
+# Pseudomonas
+Pseudomonas_Pain_strat_loc = sanon(PseudomonasAbundance_CLR ~ grp(PainCatBinary, ref="NoneMild") + strt(Run)+ strt(WoundAgeBin)+ strt(woundloc)  , data=FullData_TestSevereVsMildNone_locAgePain)
+SummaryPseudomonasPain = summary(Pseudomonas_Pain_strat_loc)
+pvalues_genus_stratified_loc_age = append(pvalues_genus_stratified_loc_age, SummaryPseudomonasPain$coefficients[4])
+StratifiedEstimates_age_locPain = append(StratifiedEstimates_age_locPain, Pseudomonas_Pain_strat_loc$xi)
+
+# anaerobes
+Anaerobes_Pain_strat_loc = sanon(AnaerobicGenusAbundance_CLR ~ grp(PainCatBinary, ref="NoneMild") + strt(Run)+ strt(WoundAgeBin) + strt(woundloc) , data=FullData_TestSevereVsMildNone_locAgePain)
+SummaryAnaerobesPain = summary(Anaerobes_Pain_strat_loc)
+pvalues_genus_stratified_loc_age = append(pvalues_genus_stratified_loc_age, SummaryAnaerobesPain$coefficients[4])
+StratifiedEstimates_age_locPain = append(StratifiedEstimates_age_locPain, Anaerobes_Pain_strat_loc$xi)
+
+# Coryne, Strep, Staph, Pseud, Anaerobes
+pvalues_genus_stratified_loc_age
+
+
+
+
+
+
 # Common genus abundance vs. wound dressing change pain (old method, before stratifying)
 #########################################################################################
 AbundanceCLR = colnames(FullData_TestSevereVsMildNone)[grepl(colnames(FullData_TestSevereVsMildNone), pattern="_CLR")]
@@ -234,6 +445,8 @@ gridExtra::grid.arrange(c5ar1plot, cxcl8plot, ilbplot, MMP2plot, CAMPplot, TNFpl
 dev.off()
 
 
+
+
 ###############
 # Figure 3C
 ###############
@@ -242,6 +455,11 @@ CytokineData = FullDataContainsMicrobiome %>% select(Significant$Cytokine)
 CorrelationsGeneraCyt = matrix(0, nrow=ncol(GeneraData), ncol=ncol(CytokineData))
 CorrelationsGeneraCytPvalues = matrix(0, nrow=ncol(GeneraData), ncol=ncol(CytokineData))
 
+Both=cbind(CytokineData, GeneraData)
+
+pdf(file="Documents/IowaWoundData2021/NewFigs_Paper_10_23/TestingBigCorrFig.pdf", width=20,height=20)
+ggpairs(Both) + theme_classic()
+dev.off()
 
 for(i in 1:ncol(GeneraData)){
   for(j in 1:ncol(CytokineData)){
@@ -278,7 +496,21 @@ ggsave(CorrHeatMapGeneraCyt, file=paste0(outputfolder, "Figure3C.pdf"), width=14
 
 
 # As an aside, relationship between Strep & pain, Coryne & pain hold when stratified by woundlocation 
-Staphylococcus_Pain_stratLocation = sanon(StaphylococcusAbundance_CLR ~ grp(PainCatBinary, ref="NoneMild") + strt(woundloc) , data=FullData_TestSevereVsMildNone)
-Streptococcus_Pain_stratLocation = sanon(StreptococcusAbundance_CLR ~ grp(PainCatBinary, ref="NoneMild") + strt(woundloc) , data=FullData_TestSevereVsMildNone)
-Corynebacterium_Pain_stratLocation = sanon(CorynebacteriumAbundance_CLR ~ grp(PainCatBinary, ref="NoneMild") + strt(woundloc) , data=FullData_TestSevereVsMildNone)
-Anaerobes_Pain_stratLocation = sanon(AnaerobicGenusAbundance_CLR ~ grp(PainCatBinary, ref="NoneMild") + strt(woundloc) , data=FullData_TestSevereVsMildNone)
+Staphylococcus_Pain_stratLocation = sanon(StaphylococcusAbundance_CLR ~ grp(PainCatBinary, ref="NoneMild") +strt(Run) + strt(woundloc) , data=FullData_TestSevereVsMildNone)
+Streptococcus_Pain_stratLocation = sanon(StreptococcusAbundance_CLR ~ grp(PainCatBinary, ref="NoneMild") + strt(Run)+ strt(woundloc) , data=FullData_TestSevereVsMildNone)
+Corynebacterium_Pain_stratLocation = sanon(CorynebacteriumAbundance_CLR ~ grp(PainCatBinary, ref="NoneMild") + strt(Run) + strt(woundloc) , data=FullData_TestSevereVsMildNone)
+Anaerobes_Pain_stratLocation = sanon(AnaerobicGenusAbundance_CLR ~ grp(PainCatBinary, ref="NoneMild") + strt(Run)+ strt(woundloc) , data=FullData_TestSevereVsMildNone)
+
+
+FullData$woundage = if_else(FullData$woundage %in% c(1,2), "Less30", "Gr30")
+
+FullDataComplete = FullData %>% filter(!is.na(DMMClusterAssign))
+FullDataComplete = FullDataComplete %>% filter(PainCatBinary!="Moderate")
+Staphylococcus_Age_stratRun = sanon(StaphylococcusAbundance_CLR ~ grp(woundage, ref="Less30") + strt(Run) , data=FullDataComplete)
+Streptococcus_Age_stratRun = sanon(StreptococcusAbundance_CLR ~ grp(woundage, ref="Less30") + strt(Run) , data=FullDataComplete)
+Corynebacterium_Age_stratRun  = sanon(CorynebacteriumAbundance_CLR ~ grp(woundage, ref="Less30") + strt(Run) , data=FullDataComplete)
+Anaerobes_Age_stratRun  = sanon(AnaerobicGenusAbundance_CLR ~ grp(woundage, ref="Less30") + strt(Run) , data=FullDataComplete)
+Pseudomonas_Age_stratRun  = sanon(PseudomonasAbundance_CLR ~ grp(woundage, ref="Less30") + strt(Run) , data=FullDataComplete)
+
+
+

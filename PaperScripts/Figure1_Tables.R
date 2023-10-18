@@ -49,7 +49,7 @@ Genus_code = function(tax_table_row){
 # Load data
 ############
 outputfolder="/Users/amycampbell/Documents/IowaWoundData2021/PublicationFiguresOutput/"
-load("/Users/amycampbell/Documents/IowaWoundData2021/PublicationData/GenusLevelBatchCorrected_Jan22.rda")
+load("/Users/amycampbell/Documents/IowaWoundData2021/PublicationData/GenusLevelBatchCorrected_22.rda")
 AnaerobeMappings = read.csv("/Users/amycampbell/Documents/IowaWoundData2021/PublicationData/AnaerobeDB.csv")
 CytokineData = read.csv("~/Documents/IowaWoundData2021/PublicationData/InflammatoryMediators.csv")
 DiversityData = read.csv("~/Documents/IowaWoundData2021/PublicationData/DiversityMetrics.csv")
@@ -167,8 +167,8 @@ NMDSOrd <- ordinate(BatchCorrectedPhyloseq, "NMDS", "bray", weighted=T, trymax=2
 BatchCorrectedPhyloseq@sam_data$assignment = factor(BatchCorrectedPhyloseq@sam_data$assignment)
 DMMordPlot = plot_ordination(BatchCorrectedPhyloseq, NMDSOrd, color="assignment", title="Ordination of Genus-aggregated OTUs by DMM Assignment") + scale_color_manual(values=OrdinationColors)
 
-DMMordPlot = DMMordPlot + theme_classic()
-
+DMMordPlot = DMMordPlot + theme_classic() + geom_point(size=3)
+DMMordPlot
 ggsave(DMMordPlot, file=paste0(outputfolder, "Figure1Cii.pdf"), width=8,height=8)
 
 
@@ -405,20 +405,22 @@ dataframe_counts = data.frame(df_phyla)
 sampnames = (unique(dataframe_counts$Sample))
 
 
-df_phyla_Firm = df_phyla %>% filter(Phylum=="Firmicutes") %>% select(wound_type_string, SampleID, Abundance)
+df_phyla_Firm = df_phyla %>% filter(Phylum=="Firmicutes") %>% select(wound_type_string,wound_type, SampleID, Abundance)
 MissingFirm = unique(setdiff(df_phyla$SampleID, df_phyla_Firm$SampleID))
-MissingFirm = df_phyla %>% filter(SampleID %in% MissingFirm) %>% ungroup() %>% select(wound_type_string, SampleID) %>% unique()
+MissingFirm = df_phyla %>% filter(SampleID %in% MissingFirm) %>% ungroup() %>% select(wound_type_string,wound_type, SampleID) %>% unique()
 MissingFirm$Phylum ="Firmicutes"
 MissingFirm$Abundance = 0.0
-MissingFirm = MissingFirm %>% select(Phylum, wound_type_string, SampleID, Abundance)
+MissingFirm = MissingFirm %>% select(Phylum, wound_type_string,wound_type, SampleID, Abundance)
 df_phyla_Firm = rbind(MissingFirm, df_phyla_Firm)
 
 
-
-Desired_order=unique((df_phyla_Firm %>% arrange(wound_type_string, -Abundance))$SampleID)
+#here
+Desired_order=unique((df_phyla_Firm %>% arrange(wound_type, -Abundance))$SampleID)
 plotPhyla= ggplot(df_phyla, aes(x=SampleID, y=Abundance, fill=Phylum)) + geom_bar(stat="identity") + ggtitle("Phylum-level composition") + scale_fill_manual(values=(randpalette18))+ theme_minimal() + theme(axis.text.x=element_text(angle=90))
 plotPhyla$data$SampleID = factor(plotPhyla$data$SampleID, levels =Desired_order)
-ggsave(plotPhyla, file=paste0(outputfolder, "Figure1B.pdf"), width=20, height=6)
+
+
+ggsave(plotPhyla, file="Documents/IowaWoundData2021/NewFigs_Paper_10_23/NewFigure1B.pdf", width=20, height=6)
 
 
 
@@ -677,6 +679,41 @@ colors = (ClusterDF %>% select(StudyID, colortext) %>% unique())$colortext
 Top12GeneraPlotSample = Top12GeneraPlotSample + theme(axis.text.x=element_text(color=colors))
 ggsave(Top12GeneraPlotSample, file=paste0(outputfolder,"FigureS2.pdf"), width=20, height=6)
 
+# New S1 figures
+################
+# A will still be variation by sequencing run
+# B will be genus-level contents by DMM cluster assignment (all samples, current S2)
+# C will be genus-level contents by etiology (bar plot)
+
+# new S1C
+
+OrderType = data.frame(PlotTop12Genera@sam_data) %>% arrange(wound_type, assignment)
+
+DFsampledata = DFsampledata %>% mutate(wound_type_string = case_when(wound_type==1 ~ "Pressure", 
+                                                                     wound_type==2 ~"Venous",
+                                                                     wound_type==4 ~"Surgical", 
+                                                                     wound_type==5 ~ "Traumatic", 
+                                                                     wound_type==6 ~ "Mixed Traumatic/Surgical",
+                                                                     wound_type==7 ~ "Other"))
+
+OrderType = OrderType %>% mutate(color = case_when(assignment==1 ~ "#4285F4", 
+                                                   assignment==2 ~"#34A853",
+                                                   assignment==3 ~ "#FBBC05", 
+                                                   assignment==4 ~ "#EA4335"))
+
+OrderType = OrderType %>% mutate(wound_type_string =case_when(wound_type==1 ~ "Pressure", 
+                                 wound_type==2 ~"Venous",
+                                 wound_type==4 ~"Surgical", 
+                                 wound_type==5 ~ "Traumatic", 
+                                 wound_type==6 ~ "Mixed Traumatic/Surgical",
+                                 wound_type==7 ~ "Other"))
+
+# genus level composition (of the ones that are most abundant in DMM cluster types)
+Top12GeneraPlotSample_type = ggplot(PlotTop12Genera_AnyDMM_bySample, aes(x=study_id, y=Abundance, fill=GenusAdjust)) + geom_bar(stat="identity") + ggtitle("Genus-level composition") + scale_fill_manual(values=(color21))+ theme_minimal() + theme(axis.text.x=element_text(angle=90))
+Top12GeneraPlotSample_type$data$study_id = factor(Top12GeneraPlotSample_type$data$study_id , levels=OrderType$study_id)
+
+Top12GeneraPlotSample_type = Top12GeneraPlotSample_type + theme(axis.text.x=element_text(color=OrderType$color))
+ggsave(Top12GeneraPlotSample_type, file="Documents/IowaWoundData2021/NewFigs_Paper_10_23/NewFigureS1C.pdf", width=20, height=6)
 
 #########
 # Table 1
@@ -732,7 +769,7 @@ chisq.test(table(tableinflameDMM))
 
 # wound age 
 tableAgeDMM = AllData %>% select(DMMClusterAssign,woundage) %>% filter(!is.na(DMMClusterAssign))
-tableAgeDMM$woundage = if_else(tableAgeDMM$woundage %in% c(1,2), "Gr30","Less30")
+tableAgeDMM$woundage = if_else(tableAgeDMM$woundage %in% c(1,2), "Less30", "Gr30")
 print(table(tableAgeDMM))
 chisq.test(table(tableAgeDMM))
 
@@ -792,10 +829,13 @@ DiversityData$StudyID = sapply(DiversityData$StudyID, as.character)
 
 DiversityData = DiversityData%>% select(StudyID, Genus_Richness, Genus_Shannon) %>% left_join(AllData, by="StudyID")
 
-richnessplot = ggplot(DiversityData,aes(x=factor(DMMClusterAssign),y=Genus_Richness)) + geom_boxplot() + theme_classic() + xlab("DMM Cluster") + ylab("Genus Richness") + stat_compare_means()
-shannonplot = ggplot(DiversityData,aes(x=factor(DMMClusterAssign),y=Genus_Shannon)) + geom_boxplot() + theme_classic() + xlab("DMM Cluster") + ylab("Shannon Diversity (Genera)") + stat_compare_means()
-gridExtra::grid.arrange(richnessplot, shannonplot,ncol=2)
-
+richnessplot = ggplot(DiversityData,aes(x=factor(DMMClusterAssign),y=Genus_Richness, fill = factor(DMMClusterAssign))) + geom_boxplot() + theme_classic() + 
+  xlab("DMM Cluster") + ylab("Genus Richness") +   stat_compare_means(method="wilcox.test",comparisons=list(c(1,2), c(1,3),c(1,4), c(2,3), c(2,4), c(3,4))) + scale_fill_manual(values=OrdinationColors)
+shannonplot = ggplot(DiversityData,aes(x=factor(DMMClusterAssign),y=Genus_Shannon, fill=factor(DMMClusterAssign))) + geom_boxplot() + theme_classic() +
+  xlab("DMM Cluster") + ylab("Shannon Diversity (Genera)") + stat_compare_means(method="wilcox.test",comparisons=list(c(1,2), c(1,3),c(1,4), c(2,3), c(2,4), c(3,4))) + scale_fill_manual(values=OrdinationColors)
+pdf(file="Documents/IowaWoundData2021/NewFigs_Paper_10_23/DMMClusterDiversity.pdf",width=7,height=6)
+gridExtra::grid.arrange(richnessplot, shannonplot,ncol=1)
+dev.off()
 # there's a positive relationship between genus-level diversity, abudance of strict anaerobes
 #############################################################################################
 ggplot(DiversityData, aes(x=AnaerobicGenusAbundance_CLR, y=Genus_Shannon)) + geom_point() + geom_smooth(method="lm") + theme_classic()
@@ -817,4 +857,8 @@ ggplot(AllDataBinaryPainDiversity, aes(x=factor(PainCatBinary), y=Genus_Shannon)
 #############################################################################################
 ggplot(DiversityData, aes(x=factor(BinaryDressingType), y=Genus_Shannon)) + geom_boxplot()+ stat_compare_means() 
 ggplot(DiversityData, aes(x=factor(BinaryDressingType), y=Genus_Richness)) + geom_boxplot()+ stat_compare_means() 
+
+
+
+
 

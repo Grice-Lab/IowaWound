@@ -11,6 +11,7 @@ library("reshape2")
 library("viridis")
 library("gplots")
 library("rstatix")
+library("gridExtra")
 
 #library("correlation")
 #library("psych")
@@ -25,8 +26,10 @@ ClinicalData =  read.csv("Documents/IowaWoundData2021/PublicationData/ClinicalDa
 listCytokines = c("ARG1.Hs00163660_m1",  "C3.Hs00163811_m1",  "C5AR1.Hs00704891_s1", "CAMP.Hs00189038_m1",  "CXCL8.Hs00174103_m1", "IL1A.Hs00174092_m1",  "IL1B.Hs01555410_m1",
                   "IL6.Hs00174131_m1", "LCN2.Hs01008571_m1", "MMP1.Hs00899658_m1", "MMP2.Hs01548727_m1", "MMP9.Hs00957562_m1", "TNF.Hs00174128_m1")
 
-
-
+color21 =c("#7570B3", "#E7298A", "#66C2A5","#E31A1C",
+           "#BC80BD", "#A6D854", "#FDCDAC", "#A6761D", "#80B1D3",
+           "#FF9933", "#F4CAE4", "#FFFF66", "#2E8B57", "#CCEBC5", 
+           "#1F78B4", "#BEBADA","#B3B3B3","#FF6600", "#800000","#23297A", "#FB8072")
 ##########################################
 # Figure 2C: Wound care pain vs. cytokines
 ##########################################
@@ -152,8 +155,7 @@ MeltedInflammationMarkers$Cytokine = sapply(MeltedInflammationMarkers$variable, 
 MeltedInflammationMarkers$inflame = factor(if_else(MeltedInflammationMarkers$inflame==0, "Not\nInflamed", "Inflamed"))
 
 
-
-GenusStatsInflameCytokine = MeltedInflammationMarkers %>% group_by(Cytokine) %>% wilcox_test(value ~ inflame)  %>% adjust_pvalue(method = "bonferroni") %>% add_significance()  %>%  add_xy_position(x="inflammation")
+GenusStatsInflameCytokine = MeltedInflammationMarkers %>% group_by(Cytokine) %>% wilcox_test(value ~ inflame)  %>% adjust_pvalue(method = "BH") %>% add_significance()  %>%  add_xy_position(x="inflammation")
 
 GenusStatsInflameCytokine$xmin = 1
 GenusStatsInflameCytokine$xmax = 2
@@ -165,4 +167,94 @@ MeltedInflammationMarkers$inflammation =(MeltedInflammationMarkers$inflame)
 boxplotinflame = ggplot(MeltedInflammationMarkers, aes(x=inflame, y=value))+ geom_boxplot(alpha=.8,fill=colorWorkaround$colorAssign, size=.25) +geom_jitter(width=.1,size=.5) + facet_grid(~Cytokine)   +
   theme_classic() + ggpubr::stat_pvalue_manual(GenusStatsInflameCytokine,label="p") +stat_summary(fun= "mean", fun.max= "mean", fun.min= "mean", size= .3, geom = "crossbar",color="gray") + ylab("-∆CT")
 ggsave(boxplotinflame, file="~/Documents/IowaWoundData2021/PublicationFiguresOutput/Figure2b.pdf", width=10, height=8)
+ggsave(boxplotinflame, file="~/Documents/IowaWoundData2021/NewFigs_Paper_10_23/new_Figure2a.pdf", width=15, height=6)
+
+# Reviewer #1 asked whether there was more of a relationship between cytokines and pain WITHIN each of <30 and >30 day wounds
+#############################################################################################################################
+Cytokines_And_Microbiome_Pre30 = Cytokines_And_Microbiome %>% filter(woundage %in% c(1,2))
+Cytokines_And_Microbiome_Post30 = Cytokines_And_Microbiome %>% filter(!(woundage %in% c(1,2)))
+
+
+Cytokines_And_Microbiome_Pre30 = Cytokines_And_Microbiome_Pre30 %>% filter(PainCatBinary!="Moderate")
+Cytokines_And_Microbiome_Post30 = Cytokines_And_Microbiome_Post30 %>% filter(PainCatBinary!="Moderate")
+
+
+
+listPvalues_pre30 = c()
+listcytokinesTested_pre30 = c()
+listPvaluesNoneVsSevere_pre30 = c()
+kruskal_p_pre30 = c()
+for(cyt in listCytokines){
+  print(cyt)
+  testresult = (wilcox.test((Cytokines_And_Microbiome_Pre30[,cyt]) ~ Cytokines_And_Microbiome_Pre30[,"PainCatBinary"],exact=F))
+  listcytokinesTested_pre30 = c(listcytokinesTested_pre30, cyt)
+  listPvalues_pre30 = c(listPvalues_pre30, testresult$p.value)
+  
+}
+WilcoxPvalues_pre30 = data.frame(cytokine=listcytokinesTested_pre30, pvalues=listPvalues_pre30)
+WilcoxPvalues_pre30$pAdj = p.adjust(WilcoxPvalues_pre30$pvalues,method="BH")
+
+
+listPvalues_post30 = c()
+listcytokinesTested_post30 = c()
+listPvaluesNoneVsSevere_post30 = c()
+kruskal_p_post30 = c()
+for(cyt in listCytokines){
+  print(cyt)
+  testresult = (wilcox.test((Cytokines_And_Microbiome_Post30[,cyt]) ~ Cytokines_And_Microbiome_Post30[,"PainCatBinary"],exact=F))
+  listcytokinesTested_post30 = c(listcytokinesTested_post30, cyt)
+  listPvalues_post30 = c(listPvalues_post30, testresult$p.value)
+  
+}
+WilcoxPvalues_post30 = data.frame(cytokine=listcytokinesTested_post30, pvalues=listPvalues_post30)
+WilcoxPvalues_post30$pAdj = p.adjust(WilcoxPvalues_post30$pvalues,method="BH")
+
+Cytokines_And_Microbiome_Pre30_Melt = Cytokines_And_Microbiome_Pre30 %>% select(listCytokines, PainCatBinary, wound_type) %>% melt(id.vars=c("wound_type","PainCatBinary"))
+Cytokines_And_Microbiome_Post30_Melt = Cytokines_And_Microbiome_Post30 %>% select(listCytokines, PainCatBinary, wound_type) %>% melt(id.vars=c("wound_type","PainCatBinary"))
+
+
+Cytokines_And_Microbiome_Pre30_Melt$Cytokine = sapply(Cytokines_And_Microbiome_Pre30_Melt$variable, function(x) str_split(string=x,pattern=".H")[[1]][1])
+PainCytokine_Pre30 = Cytokines_And_Microbiome_Pre30_Melt %>% group_by(Cytokine) %>% wilcox_test(value ~ PainCatBinary)  %>% adjust_pvalue(method = "BH") %>% add_significance()  %>%  add_xy_position(x="PainCatBinary") 
+PainCytokine_Pre30$xmin = 1
+PainCytokine_Pre30$xmax = 2
+
+Cytokines_And_Microbiome_Post30_Melt$Cytokine = sapply(Cytokines_And_Microbiome_Post30_Melt$variable, function(x) str_split(string=x,pattern=".H")[[1]][1])
+PainCytokine_post30 = Cytokines_And_Microbiome_Post30_Melt %>% group_by(Cytokine) %>% wilcox_test(value ~ PainCatBinary)  %>% adjust_pvalue(method = "BH") %>% add_significance()  %>%  add_xy_position(x="PainCatBinary") 
+PainCytokine_post30$xmin = 1
+PainCytokine_post30$xmax = 2
+
+Pre30_plot = ggplot(Cytokines_And_Microbiome_Pre30_Melt, aes(x=PainCatBinary,y=value))+ geom_boxplot() + geom_jitter(aes(color=factor(wound_type)),height=0,width=.2) + facet_grid(~Cytokine) + 
+  theme_classic() + ggpubr::stat_pvalue_manual(PainCytokine_Pre30,label="p") + scale_color_manual(values=c( "#7570B3", "#FF9933", "#66C2A5","#A6D854", "#800000", "#1F78B4")) #+stat_summary(fun= "mean", fun.max= "mean", fun.min= "mean", size= .3, geom = "crossbar",color="gray") + ylab("-∆CT")
+
+
+Post30_plot = ggplot(Cytokines_And_Microbiome_Post30_Melt, aes(x=PainCatBinary,y=value))+ geom_boxplot() + geom_jitter( aes(color=factor(wound_type)), height=0, width=.2) + facet_grid(~Cytokine) + 
+  theme_classic() + ggpubr::stat_pvalue_manual(PainCytokine_post30,label="p")+  scale_color_manual(values=c( "#7570B3", "#FF9933", "#66C2A5","#A6D854", "#800000", "#1F78B4")) #+stat_summary(fun= "mean", fun.max= "mean", fun.min= "mean", size= .3, geom = "crossbar",color="gray") + ylab("-∆CT")
+ #+stat_summary(fun= "mean", fun.max= "mean", fun.min= "mean", size= .3, geom = "crossbar",color="gray") + ylab("-∆CT")
+pdf(file="~/Documents/IowaWoundData2021/NewFigs_Paper_10_23/new_FigureS2.pdf",width=14, height=14)
+grid.arrange(Pre30_plot, Post30_plot, ncol=1)
+dev.off()
+
+
+
+# Is baseline inflammation different between ≤30 and >30 day old wounds?
+########################################################################
+
+MeltedInflammationMarkers = Cytokines_Inflammation %>% melt(id.vars=c("inflame"))
+MeltedInflammationMarkers$Cytokine = sapply(MeltedInflammationMarkers$variable, function(x) (stringr::str_split(x, pattern="\\."))[[1]][1] )
+
+MeltedInflammationMarkers$inflame = factor(if_else(MeltedInflammationMarkers$inflame==0, "Not\nInflamed", "Inflamed"))
+
+GenusStatsInflameCytokine = MeltedInflammationMarkers %>% group_by(Cytokine) %>% wilcox_test(value ~ inflame)  %>% adjust_pvalue(method = "BH") %>% add_significance()  %>%  add_xy_position(x="inflammation")
+
+GenusStatsInflameCytokine$xmin = 1
+GenusStatsInflameCytokine$xmax = 2
+GenusStatsInflameCytokine$y.position = GenusStatsInflameCytokine$y.position - 2
+
+colorWorkaround = (MeltedInflammationMarkers %>% select(inflame, variable) %>% unique())
+colorWorkaround = colorWorkaround %>% mutate(colorAssign = if_else(inflame=="Inflamed","#984EA3","#FF7F00" ))
+MeltedInflammationMarkers$inflammation =(MeltedInflammationMarkers$inflame)
+boxplotinflame = ggplot(MeltedInflammationMarkers, aes(x=inflame, y=value))+ geom_boxplot(alpha=.8,fill=colorWorkaround$colorAssign, size=.25) +geom_jitter(width=.1,size=.5) + facet_grid(~Cytokine)   +
+  theme_classic() + ggpubr::stat_pvalue_manual(GenusStatsInflameCytokine,label="p") +stat_summary(fun= "mean", fun.max= "mean", fun.min= "mean", size= .3, geom = "crossbar",color="gray") + ylab("-∆CT")
+ggsave(boxplotinflame, file="~/Documents/IowaWoundData2021/PublicationFiguresOutput/Figure2b.pdf", width=10, height=8)
+ggsave(boxplotinflame, file="~/Documents/IowaWoundData2021/NewFigs_Paper_10_23/new_Figure2a.pdf", width=15, height=6)
 
