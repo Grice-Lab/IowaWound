@@ -48,15 +48,15 @@ Genus_code = function(tax_table_row){
 
 # Load data
 ############
-outputfolder="/Users/amycampbell/Documents/IowaWoundData2021/PublicationFiguresOutput/"
-load("/Users/amycampbell/Documents/IowaWoundData2021/PublicationData/GenusLevelBatchCorrected_22.rda")
-AnaerobeMappings = read.csv("/Users/amycampbell/Documents/IowaWoundData2021/PublicationData/AnaerobeDB.csv")
-CytokineData = read.csv("~/Documents/IowaWoundData2021/PublicationData/InflammatoryMediators.csv")
-DiversityData = read.csv("~/Documents/IowaWoundData2021/PublicationData/DiversityMetrics.csv")
+outputfolder="OutputFigures/"
+load("InputData/GenusLevelBatchCorrected_22.rda")
+AnaerobeMappings = read.csv("InputData/AnaerobeDB.csv")
+CytokineData = read.csv("InputData/InflammatoryMediators.csv")
+DiversityData = read.csv("InputData/DiversityMetrics.csv")
 
 # this is important to use-- includes wound care pain classifications with the cutoffs used in the
 # previous paper sfrom this dataset
-ClinicalData=read.csv("~/Documents/IowaWoundData2021/PublicationData/ClinicalData_UpdatedPain.csv")
+ClinicalData=read.csv("InputData/ClinicalData_UpdatedPain.csv")
 
 
 # Colors
@@ -420,7 +420,7 @@ plotPhyla= ggplot(df_phyla, aes(x=SampleID, y=Abundance, fill=Phylum)) + geom_ba
 plotPhyla$data$SampleID = factor(plotPhyla$data$SampleID, levels =Desired_order)
 
 
-ggsave(plotPhyla, file="Documents/IowaWoundData2021/NewFigs_Paper_10_23/NewFigure1B.pdf", width=20, height=6)
+ggsave(plotPhyla, file="OutputFigures/NewFigure1B.pdf", width=20, height=6)
 
 
 
@@ -510,7 +510,7 @@ FiveOrMoreGeneraDF$SampleID = row.names(FiveOrMoreGeneraDF)
 FiveOrMoreGeneraDF$SampleID = stringr::str_remove(FiveOrMoreGeneraDF$SampleID, "X")
 
 DF_Genera_Dominating5 = FiveOrMoreGeneraDF %>% left_join(DF_Genera_Dominating5, by="SampleID")
-write.csv(DF_Genera_Dominating5, file="/Users/amycampbell/Documents/IowaWoundData2021/WoundAbundanceData_CLR_DominantGenera.csv")
+write.csv(DF_Genera_Dominating5, file="OutputFigures/WoundAbundanceData_CLR_DominantGenera.csv")
 
 
 BatchCorrectedPhyloseqRankingPercent = BatchCorrectedPhyloseqRanking %>%transform_sample_counts(function(x) {x/sum(x)})
@@ -601,7 +601,7 @@ FinalDF$study_id = FinalDF$StudyID
 FullBioData = ClinicalDataAllIDs %>% left_join(FinalDF, by="study_id")
 
 
-write.csv(FullBioData, file="/Users/amycampbell/Documents/IowaWoundData2021/PublicationData/WoundMicrobiome_Cytokine_Data_Final.csv")
+write.csv(FullBioData, file="InputData/WoundMicrobiome_Cytokine_Data_Final.csv")
 
 
 ############
@@ -713,7 +713,7 @@ Top12GeneraPlotSample_type = ggplot(PlotTop12Genera_AnyDMM_bySample, aes(x=study
 Top12GeneraPlotSample_type$data$study_id = factor(Top12GeneraPlotSample_type$data$study_id , levels=OrderType$study_id)
 
 Top12GeneraPlotSample_type = Top12GeneraPlotSample_type + theme(axis.text.x=element_text(color=OrderType$color))
-ggsave(Top12GeneraPlotSample_type, file="Documents/IowaWoundData2021/NewFigs_Paper_10_23/NewFigureS1C.pdf", width=20, height=6)
+ggsave(Top12GeneraPlotSample_type, file="OutputFigures/NewFigureS1C.pdf", width=20, height=6)
 
 #########
 # Table 1
@@ -833,7 +833,7 @@ richnessplot = ggplot(DiversityData,aes(x=factor(DMMClusterAssign),y=Genus_Richn
   xlab("DMM Cluster") + ylab("Genus Richness") +   stat_compare_means(method="wilcox.test",comparisons=list(c(1,2), c(1,3),c(1,4), c(2,3), c(2,4), c(3,4))) + scale_fill_manual(values=OrdinationColors)
 shannonplot = ggplot(DiversityData,aes(x=factor(DMMClusterAssign),y=Genus_Shannon, fill=factor(DMMClusterAssign))) + geom_boxplot() + theme_classic() +
   xlab("DMM Cluster") + ylab("Shannon Diversity (Genera)") + stat_compare_means(method="wilcox.test",comparisons=list(c(1,2), c(1,3),c(1,4), c(2,3), c(2,4), c(3,4))) + scale_fill_manual(values=OrdinationColors)
-pdf(file="Documents/IowaWoundData2021/NewFigs_Paper_10_23/DMMClusterDiversity.pdf",width=7,height=6)
+pdf(file="OutputFigures/S1B_DMMClusterDiversity.pdf",width=7,height=6)
 gridExtra::grid.arrange(richnessplot, shannonplot,ncol=1)
 dev.off()
 # there's a positive relationship between genus-level diversity, abudance of strict anaerobes

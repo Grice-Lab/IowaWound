@@ -1,7 +1,7 @@
-
 # Amy Campbell
 # The heterogeneous wound microbiome varies with wound care pain, dressing practices, and inflammatory gene expression 
 # Scripts to reproduce figure 2 contents 
+# As well as figure S2
 
 library("dplyr")
 library("stringr")
@@ -16,11 +16,11 @@ library("gridExtra")
 #library("correlation")
 #library("psych")
 #library("sanon")
-outputfolder="/Users/amycampbell/Documents/IowaWoundData2021/PublicationFiguresOutput/"
+outputfolder="OutputFigures/"
 
 
-Cytokines_And_Microbiome = read.csv("Documents/IowaWoundData2021/PublicationData/WoundMicrobiome_Cytokine_Data_Final.csv")
-ClinicalData =  read.csv("Documents/IowaWoundData2021/PublicationData/ClinicalData_UpdatedPain.csv")
+Cytokines_And_Microbiome = read.csv("InputData/WoundMicrobiome_Cytokine_Data_Final.csv")
+ClinicalData =  read.csv("InputData/ClinicalData_UpdatedPain.csv")
 
 
 listCytokines = c("ARG1.Hs00163660_m1",  "C3.Hs00163811_m1",  "C5AR1.Hs00704891_s1", "CAMP.Hs00189038_m1",  "CXCL8.Hs00174103_m1", "IL1A.Hs00174092_m1",  "IL1B.Hs01555410_m1",
@@ -124,7 +124,7 @@ Hclustering = hclust(as.dist(1-JustCytCor))
 CorrHeatMap$data$Var1 = factor(CorrHeatMap$data$Var1, levels=(Hclustering$labels)[Hclustering$order])
 CorrHeatMap$data$Var2 = factor(CorrHeatMap$data$Var2, levels=(Hclustering$labels)[Hclustering$order])
 
-ggsave(CorrHeatMap, file="~/Documents/IowaWoundData2021/PublicationFiguresOutput/Figure2A.pdf", width=14,height=14)
+ggsave(CorrHeatMap, file="OutputFigures/Figure2A.pdf", width=14,height=14)
 
 
 
@@ -166,8 +166,8 @@ colorWorkaround = colorWorkaround %>% mutate(colorAssign = if_else(inflame=="Inf
 MeltedInflammationMarkers$inflammation =(MeltedInflammationMarkers$inflame)
 boxplotinflame = ggplot(MeltedInflammationMarkers, aes(x=inflame, y=value))+ geom_boxplot(alpha=.8,fill=colorWorkaround$colorAssign, size=.25) +geom_jitter(width=.1,size=.5) + facet_grid(~Cytokine)   +
   theme_classic() + ggpubr::stat_pvalue_manual(GenusStatsInflameCytokine,label="p") +stat_summary(fun= "mean", fun.max= "mean", fun.min= "mean", size= .3, geom = "crossbar",color="gray") + ylab("-∆CT")
-ggsave(boxplotinflame, file="~/Documents/IowaWoundData2021/PublicationFiguresOutput/Figure2b.pdf", width=10, height=8)
-ggsave(boxplotinflame, file="~/Documents/IowaWoundData2021/NewFigs_Paper_10_23/new_Figure2a.pdf", width=15, height=6)
+ggsave(boxplotinflame, file="OutputFigures/Figure2b.pdf", width=10, height=8)
+ggsave(boxplotinflame, file="OutputFigures/Figure2a.pdf", width=15, height=6)
 
 # Reviewer #1 asked whether there was more of a relationship between cytokines and pain WITHIN each of <30 and >30 day wounds
 #############################################################################################################################
@@ -230,7 +230,7 @@ Pre30_plot = ggplot(Cytokines_And_Microbiome_Pre30_Melt, aes(x=PainCatBinary,y=v
 Post30_plot = ggplot(Cytokines_And_Microbiome_Post30_Melt, aes(x=PainCatBinary,y=value))+ geom_boxplot() + geom_jitter( aes(color=factor(wound_type)), height=0, width=.2) + facet_grid(~Cytokine) + 
   theme_classic() + ggpubr::stat_pvalue_manual(PainCytokine_post30,label="p")+  scale_color_manual(values=c( "#7570B3", "#FF9933", "#66C2A5","#A6D854", "#800000", "#1F78B4")) #+stat_summary(fun= "mean", fun.max= "mean", fun.min= "mean", size= .3, geom = "crossbar",color="gray") + ylab("-∆CT")
  #+stat_summary(fun= "mean", fun.max= "mean", fun.min= "mean", size= .3, geom = "crossbar",color="gray") + ylab("-∆CT")
-pdf(file="~/Documents/IowaWoundData2021/NewFigs_Paper_10_23/new_FigureS2.pdf",width=14, height=14)
+pdf(file="OutputFigures/FigureS2.pdf",width=14, height=14)
 grid.arrange(Pre30_plot, Post30_plot, ncol=1)
 dev.off()
 
@@ -255,6 +255,6 @@ colorWorkaround = colorWorkaround %>% mutate(colorAssign = if_else(inflame=="Inf
 MeltedInflammationMarkers$inflammation =(MeltedInflammationMarkers$inflame)
 boxplotinflame = ggplot(MeltedInflammationMarkers, aes(x=inflame, y=value))+ geom_boxplot(alpha=.8,fill=colorWorkaround$colorAssign, size=.25) +geom_jitter(width=.1,size=.5) + facet_grid(~Cytokine)   +
   theme_classic() + ggpubr::stat_pvalue_manual(GenusStatsInflameCytokine,label="p") +stat_summary(fun= "mean", fun.max= "mean", fun.min= "mean", size= .3, geom = "crossbar",color="gray") + ylab("-∆CT")
-ggsave(boxplotinflame, file="~/Documents/IowaWoundData2021/PublicationFiguresOutput/Figure2b.pdf", width=10, height=8)
-ggsave(boxplotinflame, file="~/Documents/IowaWoundData2021/NewFigs_Paper_10_23/new_Figure2a.pdf", width=15, height=6)
+ggsave(boxplotinflame, file="OutputFigures/Figure2b.pdf", width=10, height=8)
+ggsave(boxplotinflame, file="OutputFigures/Figure2a.pdf", width=15, height=6)
 

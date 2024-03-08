@@ -1,5 +1,6 @@
 # Figure 3
 # The heterogeneous wound microbiome varies with wound care pain, dressing practices, and inflammatory gene expression 
+# Scripts to produce figure 3, Figure S3
 
 # Wound microbiome and host factors 
 library("dplyr")
@@ -15,11 +16,11 @@ library("GGally")
 #library("correlation")
 #library("psych")
 #library("sanon")
-outputfolder="/Users/amycampbell/Documents/IowaWoundData2021/PublicationFiguresOutput/"
+outputfolder="OutputFigures/"
 
 
-Cytokines_And_Microbiome = read.csv("Documents/IowaWoundData2021/PublicationData/WoundMicrobiome_Cytokine_Data_Final.csv")
-ClinicalData =  read.csv("Documents/IowaWoundData2021/PublicationData/ClinicalData_UpdatedPain.csv")
+Cytokines_And_Microbiome = read.csv("InputData/WoundMicrobiome_Cytokine_Data_Final.csv")
+ClinicalData =  read.csv("InputData/ClinicalData_UpdatedPain.csv")
 
 
 listCytokines = c("ARG1.Hs00163660_m1",  "C3.Hs00163811_m1",  "C5AR1.Hs00704891_s1", "CAMP.Hs00189038_m1",  "CXCL8.Hs00174103_m1", "IL1A.Hs00174092_m1",  "IL1B.Hs01555410_m1",
@@ -111,7 +112,7 @@ DataMeltedGenusAbundance$Genus = sapply(DataMeltedGenusAbundance$variable, funct
     theme(plot.title=element_text(hjust=.5, size=18, face="bold"), axis.text.x=element_text(size=11),strip.text.x=element_text(size=13), axis.title.x=element_text(size=14), axis.title.y=element_text(size=14), legend.position="None") + ylab("CLR.transformed relative abundance") 
   
 ggsave(GenusPainPlot, file=paste0(outputfolder, "Figure3a.pdf"))
-ggsave(GenusPainPlot, file="Documents/IowaWoundData2021/NewFigs_Paper_10_23/New_3a.pdf",width=12, height=6)
+ggsave(GenusPainPlot, file="OutputFigures/New_3a.pdf",width=12, height=6)
 
 # Genera ~ wound duration + healing -- are Strep and Coryne still associated w/ healing when you stratify on wound duration(≤30 days vs. >30 days)?
 ####################################################################################################################################################
@@ -190,7 +191,7 @@ GenusPainPlot_Post30 = ggplot(MeltedByAge_Post, aes(x=PainCatBinary, y=value, fi
   ylim(-1.2, 12.5)  + xlab("Pain Rating Category") + ggtitle("Common Genus Abundance in Wounds with \nSevere vs. None/Mild Pain Ratings (>30 days old)") +
   theme(plot.title=element_text(hjust=.5, size=18, face="bold"), axis.text.x=element_text(size=11),strip.text.x=element_text(size=13), axis.title.x=element_text(size=14), axis.title.y=element_text(size=14), legend.position="None") + ylab("CLR.transformed relative abundance") 
 
-pdf("Documents/IowaWoundData2021/NewFigs_Paper_10_23/New_S3b.pdf", width=8, height=12)
+pdf("OutputFigures/New_S3b.pdf", width=8, height=12)
 grid.arrange(GenusPainPlot_Pre30, GenusPainPlot_Post30, ncol=1)
 dev.off()
 
@@ -272,7 +273,7 @@ loc4=ggplot(MeltedByloc4, aes(x=factor(PainCatBinary), y=value, fill=factor(Genu
   geom_jitter(height=0, width=.2) + theme_classic() + facet_grid(.~Genus) +ylim(-1.2, 12.5)+ scale_fill_brewer(palette="Dark2")+
   stat_pvalue_manual(GenusStatsMeltedByloc4,label="p")
 
-pdf("Documents/IowaWoundData2021/NewFigs_Paper_10_23/New_S3c.pdf", width=9, height=12)
+pdf("OutputFigures/New_S3c.pdf", width=9, height=12)
 grid.arrange(loc1, loc2, loc4,ncol=1)
 dev.off()
 
@@ -457,7 +458,7 @@ CorrelationsGeneraCytPvalues = matrix(0, nrow=ncol(GeneraData), ncol=ncol(Cytoki
 
 Both=cbind(CytokineData, GeneraData)
 
-pdf(file="Documents/IowaWoundData2021/NewFigs_Paper_10_23/TestingBigCorrFig.pdf", width=20,height=20)
+pdf(file="OutputFigures/BigCorrFig.pdf", width=20,height=20)
 ggpairs(Both) + theme_classic()
 dev.off()
 
