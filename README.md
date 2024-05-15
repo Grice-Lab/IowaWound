@@ -1,5 +1,5 @@
 # IowaWound
-Iowa Wound Pain sequence processing/analysis from 2021-23 are described below. Scripts to reproduce the figures and table values reported in Campbell et al. (2023) can be found [here](https://github.com/Grice-Lab/IowaWound/tree/master/PaperScripts)
+Iowa Wound Pain rawsequence processing/analysis for [Campbell et al. 2024](https://doi.org/10.1111/wrr.13184) are listed below. Scripts to reproduce the figures and table values reported in Campbell et al. (2024) can be found [here](https://github.com/Grice-Lab/IowaWound/tree/master/PaperScripts), using provided data including a Phyloseq object generated with this [script](https://github.com/Grice-Lab/IowaWound/blob/master/scripts/Qiime2OutputNov.R) from Qiime2 output. The raw data are available under NCBI bioproject **PRJNA1102692**. 
 
 # (1) Make manifest .tsv’s for important already-demultiplexed reads
 
